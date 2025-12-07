@@ -1,0 +1,15 @@
+{
+    "actorSpecification": 1,
+    "name": "sandbox-manager",
+    "title": "Sandbox Manager with MCP Server",
+    "description": "Sandbox Manager Actor that exposes a Model Context Protocol (MCP) server for managing sandbox Actors",
+    "version": "0.0",
+    "buildTag": "latest",
+    "usesStandbyMode": true,
+    "meta": {
+        "templateId": "ts-standby",
+        "generatedBy": "claude-haiku-4.5"
+    },
+    "webServerMcpPath": "/mcp",
+    "dockerfile": "../Dockerfile"
+}

@@ -1,0 +1,14 @@
+{
+    "actorSpecification": 1,
+    "name": "sandbox",
+    "title": "Isolated Sandbox Actor",
+    "description": "Isolated sandbox Actor that executes code and operations in a containerized environment for AI coding agents",
+    "version": "0.0",
+    "buildTag": "latest",
+    "usesStandbyMode": true,
+    "meta": {
+        "templateId": "ts-standby",
+        "generatedBy": "claude-haiku-4.5"
+    },
+    "dockerfile": "../Dockerfile"
+}
