@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 import express from 'express';
 
 import { createMcpServer } from './mcp.js';
-import { listFiles, readFile, runCommand, writeFile } from './operations.js';
+import { executeCode, listFiles, readFile, runCommand, writeFile } from './operations.js';
 
 // The init() call configures the Actor for its environment. It's recommended to start every Actor with an init()
 await Actor.init();
@@ -83,6 +83,52 @@ app.post('/exec', async (req: Request, res: Response) => {
             stdout: '',
             stderr: '',
             exitCode: 1,
+        });
+    }
+});
+
+// Execute code (JavaScript, TypeScript, or Python)
+app.post('/execute-code', async (req: Request, res: Response) => {
+    try {
+        const { code, language, timeout } = req.body;
+
+        log.info('REST /execute-code request received', { language, codeLength: code?.length, timeout });
+
+        if (!code) {
+            log.debug('REST /execute-code: code is required');
+            res.status(400).json({
+                error: 'Code is required',
+            });
+            return;
+        }
+
+        if (!language) {
+            log.debug('REST /execute-code: language is required');
+            res.status(400).json({
+                error: 'Language is required',
+            });
+            return;
+        }
+
+        const result = await executeCode(code, language, timeout);
+
+        if (result.exitCode !== 0) {
+            log.debug('REST /execute-code completed with error', { language, exitCode: result.exitCode });
+            res.status(500).json(result);
+            return;
+        }
+
+        log.info('REST /execute-code completed successfully', { language });
+        res.json(result);
+    } catch (error) {
+        log.error('REST /execute-code error', { error });
+        const err = error as Error;
+        res.status(500).json({
+            error: err.message,
+            stdout: '',
+            stderr: '',
+            exitCode: 1,
+            language: '',
         });
     }
 });
@@ -214,6 +260,10 @@ app.listen(port, () => {
     console.log(`   POST ${serverUrl}/exec`);
     console.log(`       Execute shell commands`);
     console.log(`       Body: { command: string, cwd?: string, timeout?: number }\n`);
+    
+    console.log(`   POST ${serverUrl}/execute-code`);
+    console.log(`       Execute code (JavaScript, TypeScript, or Python)`);
+    console.log(`       Body: { code: string, language: 'js' | 'ts' | 'py', timeout?: number }\n`);
     
     console.log(`   POST ${serverUrl}/read-file`);
     console.log(`       Read file contents`);

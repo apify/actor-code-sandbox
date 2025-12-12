@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Install tsx globally for TypeScript execution in execute-code endpoint
+RUN npm install -g tsx
+
 # Create sandbox directory for operations
 RUN mkdir -p /sandbox && chmod 755 /sandbox
 

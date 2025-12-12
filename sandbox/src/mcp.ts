@@ -4,7 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { log } from 'apify';
 import * as z from 'zod';
 
-import { listFiles,readFile, runCommand, writeFile } from './operations.js';
+import { executeCode, listFiles, readFile, runCommand, writeFile } from './operations.js';
 
 /**
  * Creates and configures the MCP server with all sandbox tools
@@ -229,6 +229,68 @@ export const createMcpServer = () => {
                         {
                             type: 'text',
                             text: `Error listing files: ${err.message}`,
+                        },
+                    ],
+                    isError: true,
+                };
+            }
+        },
+    );
+
+    // Register execute-code tool
+    server.registerTool(
+        'execute-code',
+        {
+            description: 'Executes code in JavaScript, TypeScript, or Python. Each execution is isolated in a new process (no state sharing between executions).',
+            inputSchema: {
+                code: z.string().describe('The code to execute'),
+                language: z.enum(['js', 'ts', 'py']).describe('Programming language (js, ts, or py)'),
+                timeout: z.number().optional().describe('Timeout in milliseconds'),
+            },
+        },
+        async ({
+            code,
+            language,
+            timeout,
+        }: {
+            code: string;
+            language: 'js' | 'ts' | 'py';
+            timeout?: number;
+        }): Promise<CallToolResult> => {
+            try {
+                log.info('MCP execute-code tool called', { language, codeLength: code.length, timeout });
+                const result = await executeCode(code, language, timeout);
+
+                if (result.exitCode !== 0) {
+                    log.warning('MCP execute-code tool failed', { language, exitCode: result.exitCode });
+                    return {
+                        content: [
+                            {
+                                type: 'text',
+                                text: JSON.stringify(result, null, 2),
+                            },
+                        ],
+                        isError: true,
+                    };
+                }
+
+                log.info('MCP execute-code tool completed successfully', { language });
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify(result, null, 2),
+                        },
+                    ],
+                };
+            } catch (error) {
+                const err = error as Error;
+                log.error('MCP execute-code tool error', { language, error: err.message });
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `Error executing code: ${err.message}`,
                         },
                     ],
                     isError: true,

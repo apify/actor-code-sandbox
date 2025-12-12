@@ -172,6 +172,102 @@ async function main(): Promise<void> {
         'List files - invalid directory',
     );
 
+    // Test 14: Execute code - JavaScript success
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'console.log("Hello from JS")', language: 'js' },
+        200,
+        'Execute code - JavaScript success',
+    );
+
+    // Test 15: Execute code - JavaScript with newlines
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'const x = 42;\nconsole.log(x);', language: 'js' },
+        200,
+        'Execute code - JavaScript with newlines',
+    );
+
+    // Test 16: Execute code - TypeScript success
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'const x: number = 42;\nconsole.log(x);', language: 'ts' },
+        200,
+        'Execute code - TypeScript success',
+    );
+
+    // Test 17: Execute code - Python success
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'print("Hello from Python")', language: 'py' },
+        200,
+        'Execute code - Python success',
+    );
+
+    // Test 18: Execute code - Python with newlines
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'x = 42\nprint(x)', language: 'py' },
+        200,
+        'Execute code - Python with newlines',
+    );
+
+    // Test 19: Execute code - invalid language
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'console.log("test")', language: 'ruby' },
+        500,
+        'Execute code - invalid language',
+    );
+
+    // Test 20: Execute code - missing code field
+    await testEndpoint(baseUrl, 'POST', '/execute-code', { language: 'js' }, 400, 'Execute code - missing code field');
+
+    // Test 21: Execute code - missing language field
+    await testEndpoint(baseUrl, 'POST', '/execute-code', { code: 'console.log("test")' }, 400, 'Execute code - missing language field');
+
+    // Test 22: Execute code - empty code
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: '', language: 'js' },
+        400,
+        'Execute code - empty code',
+    );
+
+    // Test 23: Execute code - JavaScript error
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'throw new Error("Test error")', language: 'js' },
+        500,
+        'Execute code - JavaScript error',
+    );
+
+    // Test 24: Execute code - Python error
+    await testEndpoint(
+        baseUrl,
+        'POST',
+        '/execute-code',
+        { code: 'raise ValueError("Test error")', language: 'py' },
+        500,
+        'Execute code - Python error',
+    );
+
     // Summary
     console.log(`\n${colors.blue}Test Summary${colors.reset}`);
     const passed = results.filter((r) => r.passed).length;

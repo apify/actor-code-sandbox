@@ -1,5 +1,6 @@
 // Abstracted operations for sandbox functionality
 import { exec } from 'node:child_process';
+import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -159,9 +160,13 @@ export const listFiles = async (
     log.debug('listFiles called', { path: dirPath });
     try {
         // Use /sandbox as default, or resolve relative paths relative to /sandbox
-        const targetPath = dirPath 
-            ? (path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath))
-            : SANDBOX_DIR;
+        const resolveTargetPath = (): string => {
+            if (!dirPath) {
+                return SANDBOX_DIR;
+            }
+            return path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath);
+        };
+        const targetPath = resolveTargetPath();
 
         const entries = await fs.readdir(targetPath, { withFileTypes: true });
 
@@ -176,16 +181,133 @@ export const listFiles = async (
             path: targetPath,
             files,
         };
-    } catch (error) {
-        const err = error as Error;
-        const fallbackPath = dirPath 
-            ? (path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath))
-            : SANDBOX_DIR;
-        log.debug('listFiles failed', { path: fallbackPath, error: err.message });
+     } catch (error) {
+         const err = error as Error;
+         const resolveFallbackPath = (): string => {
+             if (!dirPath) {
+                 return SANDBOX_DIR;
+             }
+             return path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath);
+         };
+         const fallbackPath = resolveFallbackPath();
+         log.debug('listFiles failed', { path: fallbackPath, error: err.message });
         return {
             path: fallbackPath,
             files: [],
             error: err.message,
         };
+    }
+};
+
+/**
+ * Execute code in a specified language (JS, TS, or Python)
+ * 
+ * IMPORTANT: Each code execution spawns a new interpreter process to ensure isolation.
+ * This prevents agents from using variables from previous code executions.
+ * While this ensures security and isolation, it means each execution starts fresh
+ * with no access to state from previous executions. Consider this limitation when
+ * designing multi-step agent workflows that require shared state.
+ */
+export const executeCode = async (
+    code: string,
+    language: 'js' | 'ts' | 'py',
+    timeout?: number,
+): Promise<{
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+    language: string;
+}> => {
+    log.debug('executeCode called', { language, codeLength: code.length, timeout });
+    const tempFiles: string[] = [];
+    
+    try {
+        // Validate language
+        if (!['js', 'ts', 'py'].includes(language)) {
+            return {
+                stdout: '',
+                stderr: `Unsupported language: ${language}. Supported languages: js, ts, py`,
+                exitCode: 1,
+                language,
+            };
+        }
+
+        // Validate code is not empty
+        if (!code || code.trim().length === 0) {
+            return {
+                stdout: '',
+                stderr: 'Code cannot be empty',
+                exitCode: 1,
+                language,
+            };
+        }
+
+        // Create hash of code for unique filename
+        const codeHash = crypto.createHash('sha256').update(code).digest('hex').slice(0, 12);
+        const fileExtensions: Record<string, string> = {
+            js: '.js',
+            ts: '.ts',
+            py: '.py',
+        };
+        const tempFile = path.join('/tmp', `code-${codeHash}${fileExtensions[language]}`);
+        
+        // Write code to file
+        await fs.writeFile(tempFile, code, 'utf8');
+        tempFiles.push(tempFile);
+
+        let command: string;
+
+        // Build command based on language
+        if (language === 'js') {
+            command = `node ${tempFile}`;
+        } else if (language === 'ts') {
+            command = `tsx ${tempFile}`;
+        } else if (language === 'py') {
+            command = `python3 ${tempFile}`;
+        } else {
+            return {
+                stdout: '',
+                stderr: `Unsupported language: ${language}`,
+                exitCode: 1,
+                language,
+            };
+        }
+
+        const execOptions: { cwd?: string; timeout?: number; env?: NodeJS.ProcessEnv } = {
+            env: getSanitizedEnv(),
+            cwd: SANDBOX_DIR,
+        };
+
+        if (timeout) {
+            execOptions.timeout = timeout;
+        }
+
+        const { stdout, stderr } = await execAsync(command, execOptions);
+
+        log.debug('executeCode succeeded', { language, exitCode: 0 });
+        return {
+            stdout,
+            stderr,
+            exitCode: 0,
+            language,
+        };
+    } catch (error) {
+        const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
+        log.debug('executeCode failed', { language, error: err.message, exitCode: err.code || 1 });
+        return {
+            stdout: err.stdout || '',
+            stderr: err.stderr || err.message || 'Code execution failed',
+            exitCode: err.code || 1,
+            language,
+        };
+    } finally {
+        // Clean up temporary files
+        for (const tempFile of tempFiles) {
+            try {
+                await fs.unlink(tempFile);
+            } catch {
+                log.debug('Failed to clean up temp file', { path: tempFile });
+            }
+        }
     }
 };
