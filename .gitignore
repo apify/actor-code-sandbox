@@ -1,23 +1,34 @@
-# MCP directory
-mcp/
-
-# Node.js
-node_modules/
-dist/
-*.log
-*.log*
+# This file tells Git which files shouldn't be added to source control
 
 # IDE
 .idea
 .vscode
 .zed
 
-# OS
-.DS_Store
-*.swp
-*.swo
+# Storage
+storage
+apify_storage
+crawlee_storage
+
+# Node.js
+node_modules
+dist
+tsconfig.tsbuildinfo
+*.log
+*.log*
 
 # Environment
 .env
 .env.local
 .env.*.local
+
+# OS
+.DS_Store
+*.swp
+*.swo
+
+# Added by Apify CLI
+.venv
+
+# MCP
+mcp
