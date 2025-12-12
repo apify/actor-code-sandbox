@@ -16,3 +16,18 @@ node_modules
 
 # dist folder
 dist
+
+# tests
+tests
+
+# documentation
+*.md
+
+# build and dev config files
+.eslintignore
+.eslintrc*
+.prettier*
+prettier.config.*
+tsconfig.json
+tsconfig.build.json
+eslint.config.mjs

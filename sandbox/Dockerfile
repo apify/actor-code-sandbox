@@ -1,60 +1,51 @@
-# Use Debian base image with Node.js
-FROM node:22-bookworm AS builder
+# Stage 1: Builder - Compile TypeScript to standalone binary with Bun
+FROM oven/bun:1 AS builder
 
 # Set working directory
-WORKDIR /usr/src/app
+WORKDIR /build
 
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies including dev dependencies
-RUN npm install --include=dev --audit=false
-
-# Copy source files
+# Copy all source files
 COPY . ./
 
-# Build the project
-RUN npm run build
+# Install dependencies (including dev dependencies for build)
+RUN bun install
 
-# Create final image
-FROM node:22-bookworm
+# Compile TypeScript to standalone binary with Bun
+# This creates a single executable file with Bun runtime embedded
+# --minify reduces binary size
+# --target=bun-linux-x64 specifies Linux x64 architecture
+RUN bun build --compile --minify --target=bun-linux-x64 src/main.ts --outfile sandbox-api
 
-# Set working directory
-WORKDIR /usr/src/app
+# Stage 2: Runtime - Debian image with Node.js and required sandbox tools
+FROM node:24-trixie-slim
 
-# Install common development tools that might be needed in sandbox
+# Install required dependencies for sandbox operations
 RUN apt-get update && apt-get install -y \
-    git \
+    bash \
     curl \
     wget \
-    vim \
-    nano \
+    git \
     python3 \
     python3-pip \
-    build-essential \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy package files
-COPY package*.json ./
+# Create sandbox directory for operations
+RUN mkdir -p /sandbox && chmod 755 /sandbox
 
-# Install production dependencies
-RUN npm install --omit=dev --omit=optional --audit=false \
-    && echo "Installed NPM packages:" \
-    && (npm list --omit=dev --all || true) \
-    && echo "Node.js version:" \
-    && node --version \
-    && echo "NPM version:" \
-    && npm --version \
-    && rm -rf ~/.npm
+# Set working directory
+WORKDIR /app
 
-# Copy built JS files from builder image
-COPY --from=builder /usr/src/app/dist ./dist
+# Copy only the compiled binary from builder
+COPY --from=builder /build/sandbox-api /app/server
 
-# Copy remaining files
-COPY . ./
+# Ensure binary is executable and owned by root
+RUN chmod 755 /app/server && chown root:root /app/server
 
-# Run as root user (for sandbox execution)
+# Run as root user (required for sandbox execution)
 USER root
 
-# Run the application
-CMD npm run start:prod --silent
+# CRITICAL: Use exec form (square brackets) for ENTRYPOINT
+# This makes the binary PID 1 in the container
+# If the process is killed/crashes, the entire container exits
+ENTRYPOINT ["/app/server"]

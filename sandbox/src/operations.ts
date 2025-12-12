@@ -6,6 +6,8 @@ import { promisify } from 'node:util';
 
 import { log } from 'apify';
 
+import { SANDBOX_DIR } from './consts.js';
+
 const execAsync = promisify(exec);
 
 /**
@@ -37,17 +39,16 @@ export const runCommand = async (
     try {
         const execOptions: { cwd?: string; timeout?: number; env?: NodeJS.ProcessEnv } = {
             env: getSanitizedEnv(),
+            // Use /sandbox as default working directory
+            cwd: cwd || SANDBOX_DIR,
         };
-        if (cwd) {
-            execOptions.cwd = cwd;
-        }
         if (timeout) {
             execOptions.timeout = timeout;
         }
 
         const { stdout, stderr } = await execAsync(command, execOptions);
 
-        log.debug('runCommand succeeded', { command, exitCode: 0 });
+        log.debug('runCommand succeeded', { command, cwd: execOptions.cwd, exitCode: 0 });
         return {
             stdout,
             stderr,
@@ -78,22 +79,25 @@ export const writeFile = async (
 }> => {
     log.debug('writeFile called', { path: filePath, contentLength: content.length, mode });
     try {
+        // Resolve path relative to /sandbox if it's a relative path
+        const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(SANDBOX_DIR, filePath);
+        
         // Ensure directory exists
-        const dir = path.dirname(filePath);
+        const dir = path.dirname(resolvedPath);
         await fs.mkdir(dir, { recursive: true });
 
         // Write the file
-        await fs.writeFile(filePath, content, 'utf8');
+        await fs.writeFile(resolvedPath, content, 'utf8');
 
         // Set file mode if specified
         if (mode) {
-            await fs.chmod(filePath, mode);
+            await fs.chmod(resolvedPath, mode);
         }
 
-        log.debug('writeFile succeeded', { path: filePath });
+        log.debug('writeFile succeeded', { path: resolvedPath });
         return {
             success: true,
-            path: filePath,
+            path: resolvedPath,
         };
     } catch (error) {
         const err = error as Error;
@@ -118,12 +122,15 @@ export const readFile = async (
 }> => {
     log.debug('readFile called', { path: filePath });
     try {
-        const content = await fs.readFile(filePath, 'utf8');
+        // Resolve path relative to /sandbox if it's a relative path
+        const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(SANDBOX_DIR, filePath);
+        
+        const content = await fs.readFile(resolvedPath, 'utf8');
 
-        log.debug('readFile succeeded', { path: filePath, contentLength: content.length });
+        log.debug('readFile succeeded', { path: resolvedPath, contentLength: content.length });
         return {
             content,
-            path: filePath,
+            path: resolvedPath,
         };
     } catch (error) {
         const err = error as Error;
@@ -151,7 +158,10 @@ export const listFiles = async (
 }> => {
     log.debug('listFiles called', { path: dirPath });
     try {
-        const targetPath = dirPath || process.cwd();
+        // Use /sandbox as default, or resolve relative paths relative to /sandbox
+        const targetPath = dirPath 
+            ? (path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath))
+            : SANDBOX_DIR;
 
         const entries = await fs.readdir(targetPath, { withFileTypes: true });
 
@@ -168,9 +178,12 @@ export const listFiles = async (
         };
     } catch (error) {
         const err = error as Error;
-        log.debug('listFiles failed', { path: dirPath, error: err.message });
+        const fallbackPath = dirPath 
+            ? (path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath))
+            : SANDBOX_DIR;
+        log.debug('listFiles failed', { path: fallbackPath, error: err.message });
         return {
-            path: dirPath || process.cwd(),
+            path: fallbackPath,
             files: [],
             error: err.message,
         };
