@@ -67,7 +67,7 @@ The Apify log package provides the following methods for logging:
 - do not store personal/sensitive data unless explicitly permitted
 - do not use deprecated options like `requestHandlerTimeoutMillis` on CheerioCrawler (v3.x)
 - do not use `additionalHttpHeaders` - use `preNavigationHooks` instead
-- **NEVER disable standby mode (`usesStandbyMode: false`) in `.actor/actor.json` without explicit permission** - Standby mode is critical for cost efficiency. Always keep `usesStandbyMode: true` unless there is a specific documented reason to disable it
+- **NEVER disable standby mode (`usesStandbyMode: false`) in `.actor/actor.json` without explicit permission** - Standby mode is critical for cost efficiency. Always keep `usesStandbyMode: true` unless there is a specific documented reason to disable it. _Note: This Actor intentionally disables standby mode (`usesStandbyMode: false`) because it was simplified to run as a single containerized application._
 - **ALWAYS implement readiness probe handler for standby Actors** - Handle the `x-apify-container-server-readiness-probe` header at GET / endpoint to ensure proper Actor lifecycle management
 
 You can recognize a standby Actor by checking the `usesStandbyMode` property in `.actor/actor.json`. Only implement the readiness probe if this property is set to `true`.
@@ -127,83 +127,25 @@ Ask first:
 
 ## Project Structure
 
+```
 .actor/
-├── actor.json # Actor config: name, version, env vars, runtime settings
-├── input_schema.json # Input validation & Console form definition
-└── output_schema.json # Specifies where an Actor stores its output
+├── actor.json                    # Actor configuration (name, version, input schema)
 src/
-└── main.js # Actor entry point and orchestrator
-storage/ # Local storage (mirrors Cloud during development)
-├── datasets/ # Output items (JSON objects)
-├── key_value_stores/ # Files, config, INPUT
-└── request_queues/ # Pending crawl requests
-Dockerfile # Container image definition
-AGENTS.md # AI agent instructions (this file)
-
-## Manager and Sandbox Architecture
-
-The `manager/` Actor is a special orchestrator that exposes a Model Context Protocol (MCP) server. It manages underlying `sandbox/` Actors that execute in isolated Docker environments for coding AI agents.
-
-### Architecture Overview
-
-- **Manager Actor**: Central orchestrator that holds all state and connection management
-    - Exposes MCP server with tools for sandbox lifecycle and execution
-    - Routes all requests to appropriate sandbox instances based on sandbox ID
-    - Maintains state across multiple sandbox sessions
-    - Acts as the single entry point for all AI agent interactions
-
-- **Sandbox Actors**: Isolated execution environments for AI coding tasks
-    - Run in separate Docker containers for security and isolation
-    - Execute code, file operations, and commands in isolation
-    - Report results back to the manager
-    - Can be spawned and destroyed dynamically
-
-### MCP Tools Exposed by Manager
-
-The manager Actor exposes the following MCP tools:
-
-- `create-sandbox` - Creates a new sandbox Actor instance with a unique ID
-    - Parameters: `options` (optional configuration for the sandbox)
-    - Returns: `sandboxId` (unique identifier for the new sandbox)
-
-- `destroy-sandbox` - Terminates and cleans up a sandbox Actor
-    - Parameters: `sandboxId` (ID of sandbox to destroy)
-    - Returns: Success confirmation
-
-- `run-command` - Executes a shell command in a specific sandbox
-    - Parameters: `sandboxId`, `command`, `timeout` (optional), `cwd` (optional)
-    - Returns: Command output, exit code, stderr/stdout
-
-- `write-file` - Writes content to a file in a specific sandbox
-    - Parameters: `sandboxId`, `path`, `content`, `mode` (optional)
-    - Returns: Success confirmation
-
-- `read-file` - Reads file contents from a specific sandbox
-    - Parameters: `sandboxId`, `path`
-    - Returns: File content or error
-
-- `list-files` - Lists files and directories in a sandbox path
-    - Parameters: `sandboxId`, `path` (optional, defaults to root)
-    - Returns: Directory listing
-
-### Request Flow
-
-1. AI agent calls MCP tool on manager Actor
-2. Manager validates the request and extracts `sandboxId`
-3. Manager routes the request to the appropriate sandbox Actor
-4. Sandbox Actor executes the requested operation
-5. Sandbox returns result to manager
-6. Manager returns result to AI agent
-
-### Sandbox Isolation
-
-Each sandbox Actor:
-
-- Runs in its own Docker container with independent filesystem
-- Has its own isolated environment variables and working directory
-- Cannot access other sandbox instances
-- Can be independently scaled, restarted, or destroyed
-- Maintains its own state and storage
+├── main.ts                       # Express HTTP server & Actor initialization
+├── mcp.ts                        # Model Context Protocol (MCP) server
+├── operations.ts                 # Core execution operations (shell, Python, Node.js)
+├── environment.ts                # Sandbox environment setup & library installation
+├── types.ts                      # TypeScript type definitions and interfaces
+└── consts.ts                     # Constants and configuration values
+tests/
+└── rest-endpoints.ts             # REST API endpoint tests
+storage/                          # Local storage (mirrors Cloud during development)
+├── datasets/                     # Output items (JSON objects)
+├── key_value_stores/             # Files, config, INPUT
+└── request_queues/               # Pending crawl requests
+Dockerfile                        # Container image definition
+AGENTS.md                         # AI agent instructions (this file)
+```
 
 ## Actor Input Schema
 
