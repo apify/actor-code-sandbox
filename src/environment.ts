@@ -350,7 +350,13 @@ export const executeInitScript = async (
 
         const { stdout, stderr } = await execAsync(`bash ${tempFile}`, execOptions);
 
-        log.info('Init script executed successfully', { stdout: stdout.length, stderr: stderr.length });
+        log.info('Init script execution completed');
+        log.info('-----------------------------------------');
+        log.info(stdout || '(no output)');
+        if (stderr) {
+            log.warning(stderr);
+        }
+        log.info('-----------------------------------------');
 
         return {
             success: true,
@@ -360,11 +366,18 @@ export const executeInitScript = async (
         };
     } catch (error) {
         const err = error as { message: string; stdout?: string; stderr?: string; code?: number };
-        log.error('Init script execution failed', {
-            error: err.message,
-            exitCode: err.code || 1,
-            stderr: err.stderr,
-        });
+        log.error('Init script execution failed', { exitCode: err.code || 1 });
+        log.error('-----------------------------------------');
+        if (err.stdout) {
+            log.error(err.stdout);
+        }
+        if (err.stderr) {
+            log.error(err.stderr);
+        }
+        if (!err.stdout && !err.stderr) {
+            log.error(err.message);
+        }
+        log.error('-----------------------------------------');
 
         return {
             success: false,
