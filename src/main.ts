@@ -47,8 +47,6 @@ if (input?.initScript) {
             stderr: initResult.stderr,
             stdout: initResult.stdout,
         });
-    } else {
-        log.info('Init script executed successfully');
     }
 }
 

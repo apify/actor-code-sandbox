@@ -131,9 +131,6 @@ export const installNodeLibraries = async (
     const installed: string[] = [];
     const failed: { library: string; error: string }[] = [];
 
-    // Ensure node_modules exists
-    await initializeNodeEnvironment();
-
     for (const library of libraries) {
         try {
             log.debug('Installing Node.js library', { library });
