@@ -19,14 +19,20 @@
             "nodeLibraries": {
                 "title": "Node.js Libraries",
                 "type": "array",
-                "description": "Enter Node.js/npm libraries to install for JavaScript and TypeScript code execution (/sandbox/js-ts)",
+                "description": "Array of strings: Enter Node.js/npm libraries to install for JavaScript and TypeScript code execution (/sandbox/js-ts). Example: [\"zod\", \"axios\"]",
+                "items": {
+                    "type": "string"
+                },
                 "prefill": [],
                 "editor": "json"
             },
             "pythonLibraries": {
                 "title": "Python Libraries",
                 "type": "array",
-                "description": "Enter Python libraries (pip packages) to install for Python code execution (/sandbox/py)",
+                "description": "Array of strings: Enter Python libraries (pip packages) to install for Python code execution (/sandbox/py). Example: [\"requests\", \"pandas\"]",
+                "items": {
+                    "type": "string"
+                },
                 "prefill": [],
                 "editor": "json"
             },
