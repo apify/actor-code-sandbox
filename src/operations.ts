@@ -148,13 +148,11 @@ export const listFiles = async (
     log.debug('listFiles called', { path: dirPath });
     try {
         // Use /sandbox as default, or resolve relative paths relative to /sandbox
-        const resolveTargetPath = (): string => {
-            if (!dirPath) {
-                return SANDBOX_DIR;
-            }
-            return path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath);
-        };
-        const targetPath = resolveTargetPath();
+        const targetPath = !dirPath
+            ? SANDBOX_DIR
+            : path.isAbsolute(dirPath)
+              ? dirPath
+              : path.join(SANDBOX_DIR, dirPath);
 
         const entries = await fs.readdir(targetPath, { withFileTypes: true });
 
@@ -171,16 +169,14 @@ export const listFiles = async (
         };
     } catch (error) {
         const err = error as Error;
-        const resolveFallbackPath = (): string => {
-            if (!dirPath) {
-                return SANDBOX_DIR;
-            }
-            return path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath);
-        };
-        const fallbackPath = resolveFallbackPath();
-        log.debug('listFiles failed', { path: fallbackPath, error: err.message });
+        const targetPath = !dirPath
+            ? SANDBOX_DIR
+            : path.isAbsolute(dirPath)
+              ? dirPath
+              : path.join(SANDBOX_DIR, dirPath);
+        log.debug('listFiles failed', { path: targetPath, error: err.message });
         return {
-            path: fallbackPath,
+            path: targetPath,
             files: [],
             error: err.message,
         };
@@ -230,14 +226,14 @@ export const executeCode = async (
             };
         }
 
-        // Create hash of code for unique filename
-        const codeHash = crypto.createHash('sha256').update(code).digest('hex').slice(0, 12);
+        // Generate unique filename using random ID (not SHA256 hash for efficiency)
+        const uniqueId = crypto.randomBytes(6).toString('hex');
         const fileExtensions: Record<string, string> = {
             js: '.js',
             ts: '.ts',
             py: '.py',
         };
-        const tempFile = path.join('/tmp', `code-${codeHash}${fileExtensions[language]}`);
+        const tempFile = path.join('/tmp', `code-${uniqueId}${fileExtensions[language]}`);
 
         // Write code to file
         await fs.writeFile(tempFile, code, 'utf8');
@@ -253,16 +249,10 @@ export const executeCode = async (
         } else if (language === 'ts') {
             command = `tsx ${tempFile}`;
             executionDir = JS_TS_CODE_DIR;
-        } else if (language === 'py') {
+        } else {
+            // language === 'py'
             command = `python ${tempFile}`;
             executionDir = PYTHON_CODE_DIR;
-        } else {
-            return {
-                stdout: '',
-                stderr: `Unsupported language: ${language}`,
-                exitCode: 1,
-                language,
-            };
         }
 
         const execOptions: { cwd?: string; timeout?: number; env?: NodeJS.ProcessEnv } = {

@@ -71,17 +71,19 @@ export const initializeNodeEnvironment = async (): Promise<void> => {
 export const initializePythonEnvironment = async (): Promise<void> => {
     log.debug('Initializing Python virtual environment');
     try {
-        // Initialize code directories first
-        await initializeCodeDirectories();
-
         // Check if venv already exists
         try {
             await fs.stat(EXECUTION_DIRS.PYTHON_VENV);
             log.debug('Python venv already exists', { path: EXECUTION_DIRS.PYTHON_VENV });
+            // Ensure code directories exist even if venv already exists
+            await initializeCodeDirectories();
             return;
         } catch {
             // venv doesn't exist, create it
         }
+
+        // Initialize code directories first
+        await initializeCodeDirectories();
 
         // Create Python venv with clean environment to avoid conflicts
         log.debug('Creating Python venv', { path: EXECUTION_DIRS.PYTHON_VENV });
@@ -284,10 +286,10 @@ export const executeInitScript = async (
             };
         }
 
-        // Create temp file for script
+        // Create temp file for script with unique ID
         const crypto = await import('node:crypto');
-        const scriptHash = crypto.createHash('sha256').update(script).digest('hex').slice(0, 12);
-        const tempFile = path.join('/tmp', `init-script-${scriptHash}.sh`);
+        const uniqueId = crypto.randomBytes(6).toString('hex');
+        const tempFile = path.join('/tmp', `init-script-${uniqueId}.sh`);
 
         // Write script to temp file
         await fs.writeFile(tempFile, script, 'utf8');
