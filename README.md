@@ -8,21 +8,36 @@ Isolated sandbox for running AI coding operations in a containerized environment
 - **🤖 AI agent development:** Provide isolated and managed development environments where AI agents can code, test, and execute operations securely
 - **📦 Sandboxed operations:** Execute system commands, file operations, and custom scripts in a contained environment
 
-## How to use
+## How to run
 
-- **Connect with MCP client:** Use a Model Context Protocol (MCP) client to interact with this sandbox. See [modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
-- **Use Apify SDK:** Connect programmatically using the Apify SDK for direct integration
-- **REST API:** Access the sandbox directly via REST API endpoints
+### Start the Actor
 
-### Connect with Claude code
+1. Run it on the Apify platform through the [Console](https://console.apify.com/)
+2. Check the Actor run log console for connection details (host, port, MCP endpoint URL)
 
-To connect this sandbox to Claude code client, run:
+### Connect to the sandbox
+
+Once the Actor is running, you can interact with it in three ways:
+
+#### MCP Client
+
+Use a Model Context Protocol (MCP) client to interact with this sandbox. See [modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
+
+**Connect with Claude code:**
 
 ```bash
 claude mcp add --transport http sandbox https://YOUR-RUN-ID.runs.apify.net/mcp
 ```
 
-Replace `YOUR-RUN-ID` with the actual run ID from your Actor execution.
+Replace `YOUR-RUN-ID` with the actual run ID from your Actor execution (found in the logs).
+
+#### Apify SDK
+
+Connect programmatically using the Apify SDK for direct integration. ⚠️ **Work in progress** - SDK integration is currently being built.
+
+#### REST API
+
+Access the sandbox directly via REST API endpoints. The complete list of available endpoints and their required arguments are documented in the Actor run logs.
 
 ## Configuration
 
@@ -76,15 +91,6 @@ apt-get update && apt-get install -y curl
 # Create custom directory with permissions
 mkdir -p /sandbox/custom-data && chmod 755 /sandbox/custom-data
 ```
-
-## Running this Actor
-
-To use the sandbox, you first need to run the Actor:
-
-1. Run it on the Apify platform through the [Console](https://console.apify.com/)
-2. Check the Actor run log console for connection details (host, port, MCP endpoint)
-3. Use it via the Apify SDK with your preferred language
-4. Connect it to an MCP client for AI agent integration or call it via REST API for programmatic access
 
 ## Learn more
 
