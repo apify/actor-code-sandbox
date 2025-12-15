@@ -10,13 +10,35 @@
         "templateId": "ts-standby",
         "generatedBy": "claude-haiku-4.5"
     },
-	"input": {
-		"title": "Actor input schema",
-		"description": "Isolated sandbox for running AI coding operations in a containerized environment. 🚀\n\n## How to use\n* **Connect with MCP client:** Use a Model Context Protocol (MCP) client to interact with this sandbox. See https://modelcontextprotocol.io/clients\n* **Use Apify SDK:** Connect programmatically using the Apify SDK for direct integration\n* **REST API:** Access the sandbox directly via REST API endpoints\n\n## Configuration\n* **Memory & timeout:** Configure run options below to set memory allocation and execution timeout\n* **Check logs:** Open the Actor run log console to view connection details and operation output",
-		"type": "object",
-		"schemaVersion": 1,
-		"properties": {},
-		"required": []
-	},
+    "input": {
+        "title": "Actor input schema",
+        "description": "Isolated sandbox for running AI coding operations in a containerized environment. 🚀\n\n## How to use\n* **Connect with MCP client:** Use a Model Context Protocol (MCP) client to interact with this sandbox. See https://modelcontextprotocol.io/clients\n* **Use Apify SDK:** Connect programmatically using the Apify SDK for direct integration\n* **REST API:** Access the sandbox directly via REST API endpoints\n\n## Configuration\n* **Memory & timeout:** Configure run options below to set memory allocation and execution timeout\n* **Check logs:** Open the Actor run log console to view connection details and operation output",
+        "type": "object",
+        "schemaVersion": 1,
+        "properties": {
+            "nodeLibraries": {
+                "title": "Node.js Libraries",
+                "type": "array",
+                "description": "Enter Node.js/npm libraries to install for JavaScript and TypeScript code execution (/sandbox/js-ts)",
+                "prefill": [],
+                "editor": "json"
+            },
+            "pythonLibraries": {
+                "title": "Python Libraries",
+                "type": "array",
+                "description": "Enter Python libraries (pip packages) to install for Python code execution (/sandbox/py)",
+                "prefill": [],
+                "editor": "json"
+            },
+            "initScript": {
+                "title": "Initialization Script",
+                "type": "string",
+                "description": "Optional bash script to customize the sandbox environment. Runs after library installation in /sandbox directory. Use for installing system packages, creating directories, or other setup tasks.",
+                "editor": "textfield",
+                "prefill": "#!/bin/bash\n# Example: apt-get install -y some-package\n# Example: mkdir -p /sandbox/custom-dir"
+            }
+        },
+        "required": []
+    },
     "dockerfile": "../Dockerfile"
 }

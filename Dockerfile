@@ -1,5 +1,5 @@
-# Stage 1: Builder - Compile TypeScript to standalone binary with Bun
-FROM oven/bun:1 AS builder
+# Stage 1: Builder - Compile TypeScript with Node.js
+FROM node:24-trixie-slim AS builder
 
 # Set working directory
 WORKDIR /build
@@ -7,16 +7,13 @@ WORKDIR /build
 # Copy all source files
 COPY . ./
 
-# Install dependencies (including dev dependencies for build)
-RUN bun install
+# Install all dependencies (including dev dependencies for build)
+RUN npm install
 
-# Compile TypeScript to standalone binary with Bun
-# This creates a single executable file with Bun runtime embedded
-# --minify reduces binary size
-# --target=bun-linux-x64 specifies Linux x64 architecture
-RUN bun build --compile --minify --target=bun-linux-x64 src/main.ts --outfile sandbox-api
+# Compile TypeScript to JavaScript
+RUN npm run build
 
-# Stage 2: Runtime - Debian image with Node.js and required sandbox tools
+# Stage 2: Runtime - Node.js image
 FROM node:24-trixie-slim
 
 # Install required dependencies for sandbox operations
@@ -26,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     git \
     python3 \
+    python3-venv \
     python3-pip \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -39,16 +37,18 @@ RUN mkdir -p /sandbox && chmod 755 /sandbox
 # Set working directory
 WORKDIR /app
 
-# Copy only the compiled binary from builder
-COPY --from=builder /build/sandbox-api /app/server
+# Copy compiled dist folder from builder
+COPY --from=builder /build/dist /app/dist
 
-# Ensure binary is executable and owned by root
-RUN chmod 755 /app/server && chown root:root /app/server
+# Copy package.json and production node_modules from builder
+COPY --from=builder /build/package.json /app/package.json
+COPY --from=builder /build/package-lock.json /app/package-lock.json
+
+# Install production dependencies only
+RUN npm install --production
 
 # Run as root user (required for sandbox execution)
 USER root
 
-# CRITICAL: Use exec form (square brackets) for ENTRYPOINT
-# This makes the binary PID 1 in the container
-# If the process is killed/crashes, the entire container exits
-ENTRYPOINT ["/app/server"]
+# Use Node.js to execute the compiled application
+ENTRYPOINT ["node", "/app/dist/main.js"]

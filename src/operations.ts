@@ -7,22 +7,10 @@ import { promisify } from 'node:util';
 
 import { log } from 'apify';
 
-import { SANDBOX_DIR } from './consts.js';
+import { SANDBOX_DIR, PYTHON_CODE_DIR, JS_TS_CODE_DIR } from './consts.js';
+import { getExecutionEnvironment } from './environment.js';
 
 const execAsync = promisify(exec);
-
-/**
- * Get sanitized environment without APIFY_* variables
- */
-export const getSanitizedEnv = (): NodeJS.ProcessEnv => {
-    const env: NodeJS.ProcessEnv = {};
-    Object.keys(process.env).forEach((key) => {
-        if (!key.startsWith('APIFY_')) {
-            env[key] = process.env[key];
-        }
-    });
-    return env;
-};
 
 /**
  * Execute a shell command
@@ -39,7 +27,7 @@ export const runCommand = async (
     log.debug('runCommand called', { command, cwd, timeout });
     try {
         const execOptions: { cwd?: string; timeout?: number; env?: NodeJS.ProcessEnv } = {
-            env: getSanitizedEnv(),
+            env: getExecutionEnvironment(),
             // Use /sandbox as default working directory
             cwd: cwd || SANDBOX_DIR,
         };
@@ -82,7 +70,7 @@ export const writeFile = async (
     try {
         // Resolve path relative to /sandbox if it's a relative path
         const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(SANDBOX_DIR, filePath);
-        
+
         // Ensure directory exists
         const dir = path.dirname(resolvedPath);
         await fs.mkdir(dir, { recursive: true });
@@ -125,7 +113,7 @@ export const readFile = async (
     try {
         // Resolve path relative to /sandbox if it's a relative path
         const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(SANDBOX_DIR, filePath);
-        
+
         const content = await fs.readFile(resolvedPath, 'utf8');
 
         log.debug('readFile succeeded', { path: resolvedPath, contentLength: content.length });
@@ -172,7 +160,7 @@ export const listFiles = async (
 
         const files = entries.map((entry) => ({
             name: entry.name,
-            type: entry.isDirectory() ? 'directory' as const : ('file' as const),
+            type: entry.isDirectory() ? ('directory' as const) : ('file' as const),
             path: path.join(targetPath, entry.name),
         }));
 
@@ -181,16 +169,16 @@ export const listFiles = async (
             path: targetPath,
             files,
         };
-     } catch (error) {
-         const err = error as Error;
-         const resolveFallbackPath = (): string => {
-             if (!dirPath) {
-                 return SANDBOX_DIR;
-             }
-             return path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath);
-         };
-         const fallbackPath = resolveFallbackPath();
-         log.debug('listFiles failed', { path: fallbackPath, error: err.message });
+    } catch (error) {
+        const err = error as Error;
+        const resolveFallbackPath = (): string => {
+            if (!dirPath) {
+                return SANDBOX_DIR;
+            }
+            return path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath);
+        };
+        const fallbackPath = resolveFallbackPath();
+        log.debug('listFiles failed', { path: fallbackPath, error: err.message });
         return {
             path: fallbackPath,
             files: [],
@@ -201,7 +189,7 @@ export const listFiles = async (
 
 /**
  * Execute code in a specified language (JS, TS, or Python)
- * 
+ *
  * IMPORTANT: Each code execution spawns a new interpreter process to ensure isolation.
  * This prevents agents from using variables from previous code executions.
  * While this ensures security and isolation, it means each execution starts fresh
@@ -220,7 +208,7 @@ export const executeCode = async (
 }> => {
     log.debug('executeCode called', { language, codeLength: code.length, timeout });
     const tempFiles: string[] = [];
-    
+
     try {
         // Validate language
         if (!['js', 'ts', 'py'].includes(language)) {
@@ -250,20 +238,24 @@ export const executeCode = async (
             py: '.py',
         };
         const tempFile = path.join('/tmp', `code-${codeHash}${fileExtensions[language]}`);
-        
+
         // Write code to file
         await fs.writeFile(tempFile, code, 'utf8');
         tempFiles.push(tempFile);
 
         let command: string;
+        let executionDir: string;
 
-        // Build command based on language
+        // Build command based on language and set execution directory
         if (language === 'js') {
             command = `node ${tempFile}`;
+            executionDir = JS_TS_CODE_DIR;
         } else if (language === 'ts') {
             command = `tsx ${tempFile}`;
+            executionDir = JS_TS_CODE_DIR;
         } else if (language === 'py') {
-            command = `python3 ${tempFile}`;
+            command = `python ${tempFile}`;
+            executionDir = PYTHON_CODE_DIR;
         } else {
             return {
                 stdout: '',
@@ -274,8 +266,8 @@ export const executeCode = async (
         }
 
         const execOptions: { cwd?: string; timeout?: number; env?: NodeJS.ProcessEnv } = {
-            env: getSanitizedEnv(),
-            cwd: SANDBOX_DIR,
+            env: getExecutionEnvironment(),
+            cwd: executionDir,
         };
 
         if (timeout) {

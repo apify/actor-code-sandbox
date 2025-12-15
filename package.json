@@ -31,7 +31,6 @@
         "start:dev": "tsx src/main.ts",
         "start:standby": "APIFY_META_ORIGIN=\"STANDBY\" npm run start:dev",
         "build": "tsc -p tsconfig.build.json",
-        "build:binary": "bun build --compile --minify src/main.ts --outfile sandbox-api",
         "lint": "eslint",
         "lint:fix": "eslint --fix",
         "format": "prettier --write .",

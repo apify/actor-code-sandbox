@@ -1,13 +1,58 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { Actor , log } from 'apify';
+import { Actor, log } from 'apify';
 import type { Request, Response } from 'express';
 import express from 'express';
 
+import type { ActorInput } from './types.js';
 import { createMcpServer } from './mcp.js';
 import { executeCode, listFiles, readFile, runCommand, writeFile } from './operations.js';
+import { setupExecutionEnvironment, executeInitScript } from './environment.js';
 
 // The init() call configures the Actor for its environment. It's recommended to start every Actor with an init()
 await Actor.init();
+
+// Retrieve Actor input
+const input = await Actor.getInput<ActorInput>();
+log.info('Actor input retrieved', {
+    hasNodeLibraries: !!input?.nodeLibraries?.length,
+    hasPythonLibraries: !!input?.pythonLibraries?.length,
+    hasInitScript: !!input?.initScript,
+});
+
+// Setup execution environment with libraries
+log.info('Setting up execution environment...');
+const setupResult = await setupExecutionEnvironment({
+    nodeLibraries: input?.nodeLibraries || [],
+    pythonLibraries: input?.pythonLibraries || [],
+});
+
+if (!setupResult.success) {
+    log.warning('Some libraries failed to install', {
+        nodeInstalled: setupResult.nodeSetup.installed,
+        nodeFailed: setupResult.nodeSetup.failed,
+        pythonInstalled: setupResult.pythonSetup.installed,
+        pythonFailed: setupResult.pythonSetup.failed,
+    });
+} else {
+    log.info('All libraries installed successfully');
+}
+
+// Execute init script if provided
+if (input?.initScript) {
+    log.info('Executing init script...');
+    const initResult = await executeInitScript(input.initScript);
+    if (initResult.exitCode !== 0) {
+        log.error('Init script failed', {
+            exitCode: initResult.exitCode,
+            stderr: initResult.stderr,
+            stdout: initResult.stdout,
+        });
+    } else {
+        log.info('Init script executed successfully');
+    }
+}
+
+log.info('Actor startup complete - ready for requests');
 
 // Create Express app
 const app = express();
@@ -245,40 +290,40 @@ const serverUrl = process.env.ACTOR_WEB_SERVER_URL || `http://localhost:${port}`
 app.listen(port, () => {
     log.info(`Sandbox Actor listening on port ${port}`);
     log.info(`Server URL: ${serverUrl}`);
-    
+
     // Print startup information
     console.log('\n=====================================');
     console.log('🚀 Sandbox Actor Started');
     console.log('=====================================\n');
-    
+
     // MCP Server URL
     console.log('📡 MCP Server Endpoint:');
     console.log(`        ${serverUrl}/mcp\n`);
-    
+
     // REST API Endpoints
     console.log('🔧 Available REST Endpoints:');
     console.log(`   POST ${serverUrl}/exec`);
     console.log(`       Execute shell commands`);
     console.log(`       Body: { command: string, cwd?: string, timeout?: number }\n`);
-    
+
     console.log(`   POST ${serverUrl}/execute-code`);
     console.log(`       Execute code (JavaScript, TypeScript, or Python)`);
     console.log(`       Body: { code: string, language: 'js' | 'ts' | 'py', timeout?: number }\n`);
-    
+
     console.log(`   POST ${serverUrl}/read-file`);
     console.log(`       Read file contents`);
     console.log(`       Body: { path: string }\n`);
-    
+
     console.log(`   POST ${serverUrl}/write-file`);
     console.log(`       Write file contents`);
     console.log(`       Body: { path: string, content: string, mode?: number }\n`);
-    
+
     console.log(`   POST ${serverUrl}/list-files`);
     console.log(`       List directory contents`);
     console.log(`       Body: { path?: string }\n`);
-    
+
     console.log(`   GET ${serverUrl}/health`);
     console.log(`       Health check\n`);
-    
+
     console.log('=====================================\n');
 });

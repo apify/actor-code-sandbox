@@ -23,11 +23,9 @@ tests
 # documentation
 *.md
 
-# build and dev config files
+# build and dev config files (keep tsconfig files for build)
 .eslintignore
 .eslintrc*
 .prettier*
 prettier.config.*
-tsconfig.json
-tsconfig.build.json
 eslint.config.mjs
