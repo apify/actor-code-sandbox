@@ -1,0 +1,44 @@
+{
+    "actorSpecification": 1,
+    "name": "sandbox",
+    "title": "Isolated Sandbox Actor",
+    "description": "Isolated sandbox Actor that executes code and operations in a containerized environment for AI coding agents",
+    "version": "0.0",
+    "buildTag": "latest",
+    "usesStandbyMode": false,
+    "meta": {
+        "templateId": "ts-standby",
+        "generatedBy": "claude-haiku-4.5"
+    },
+    "input": {
+        "title": "Actor input schema",
+        "description": "Isolated sandbox for running AI coding operations in a containerized environment. 🚀\n\n## How to use\n* **Connect with MCP client:** Use a Model Context Protocol (MCP) client to interact with this sandbox. See https://modelcontextprotocol.io/clients\n* **Use Apify SDK:** Connect programmatically using the Apify SDK for direct integration\n* **REST API:** Access the sandbox directly via REST API endpoints\n\n## Configuration\n* **Memory & timeout:** Configure run options below to set memory allocation and execution timeout\n* **Check logs:** Open the Actor run log console to view connection details and operation output",
+        "type": "object",
+        "schemaVersion": 1,
+        "properties": {
+            "nodeDependencies": {
+                "title": "Node.js Dependencies",
+                "type": "object",
+                "description": "npm package.json dependencies object for JavaScript and TypeScript code execution (/sandbox/js-ts). Paste your dependencies in npm format. Example: {\"zod\": \"^3.0\", \"axios\": \"latest\"}",
+                "editor": "json",
+                "prefill": {}
+            },
+            "pythonRequirementsTxt": {
+                "title": "Python Requirements",
+                "type": "string",
+                "description": "Python requirements in requirements.txt format for Python code execution (/sandbox/py). Paste your dependencies one per line. Example:\n requests==2.31.0\npandas>=2.0.0",
+                "editor": "textarea",
+                "prefill": ""
+            },
+            "initScript": {
+                "title": "Initialization Script",
+                "type": "string",
+                "description": "Optional bash script to customize the sandbox environment. Runs after library installation in /sandbox directory. Use for installing system packages, creating directories, or other setup tasks.",
+                "editor": "textarea",
+                "prefill": "#!/bin/bash\n# Example: apt-get install -y some-package\n# Example: mkdir -p /sandbox/custom-dir"
+            }
+        },
+        "required": []
+    },
+    "dockerfile": "../Dockerfile"
+}
