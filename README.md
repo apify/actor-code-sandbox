@@ -54,6 +54,8 @@ Access an interactive shell terminal in your browser at `https://YOUR-RUN-ID.run
 
 ## Sandbox Environment Structure
 
+The sandbox runs on a **Debian Trixie** container image with **Node.js 24**, **Python 3**, and essential development tools pre-installed.
+
 The sandbox provides isolated execution environments for different code languages:
 
 ### Code Execution Directories
