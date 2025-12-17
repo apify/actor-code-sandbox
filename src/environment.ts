@@ -124,10 +124,9 @@ export const initializePythonEnvironment = async (): Promise<void> => {
         log.debug('Creating Python venv', { path: EXECUTION_DIRS.PYTHON_VENV });
 
         // Create a clean environment without PYTHONHOME/VIRTUAL_ENV to prevent conflicts
-        // TODO: Consider reworking this to simplify environment handling for venv creation
         const cleanEnv: NodeJS.ProcessEnv = {};
         Object.keys(process.env).forEach((key) => {
-            if (key !== 'PYTHONHOME' && key !== 'VIRTUAL_ENV') {
+            if (!key.startsWith('APIFY_') && key !== 'PYTHONHOME' && key !== 'VIRTUAL_ENV') {
                 cleanEnv[key] = process.env[key];
             }
         });
@@ -330,7 +329,14 @@ export const setupExecutionEnvironment = async (input: {
  * Returns environment with paths to Python venv and Node modules
  */
 export const getExecutionEnvironment = (): NodeJS.ProcessEnv => {
-    const env: NodeJS.ProcessEnv = { ...process.env };
+    const env: NodeJS.ProcessEnv = {};
+
+    // Copy non-APIFY variables
+    Object.keys(process.env).forEach((key) => {
+        if (!key.startsWith('APIFY_')) {
+            env[key] = process.env[key];
+        }
+    });
 
     // Add Python venv to PATH
     const currentPath = env.PATH || '';

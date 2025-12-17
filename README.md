@@ -92,29 +92,6 @@ Specify dependencies to install via Actor input:
 
 Dependencies are installed during Actor startup before any code execution, allowing your code to immediately use them.
 
-### Pre-installed Global Tools
-
-The sandbox includes the following globally available tools:
-
-- **Apify CLI** (`apify`): Command-line interface for Apify platform operations
-    - Full access to APIFY_TOKEN via environment variables for authentication
-    - Helps manage the Apify cloud platform and develop, build, and deploy Actors
-    - **Most important use cases:**
-        - **Execute Actors**: `apify call <actor-name>` to run other Actors remotely and retrieve results
-        - **Deploy Actors**: `apify push` to deploy your Actor code to the Apify platform
-        - **Manage Runs**: View run status, download outputs, and monitor Actor execution
-        - **Work with Datasets**: Manage structured data storage for outputs
-        - **Create Projects**: `apify create` to scaffold new Actor projects from templates
-        - **Account Management**: `apify info` to view account details, `apify login/logout` for authentication
-    - Example commands:
-        ```bash
-        apify call my-scraper --input '{"url":"https://example.com"}'
-        apify push
-        apify pull my-actor
-        apify info
-        ```
-- **tsx**: TypeScript executor for direct TypeScript execution in Node.js
-
 ### Customization with Init Script
 
 Provide a bash script via the "Initialization Script" input to customize the sandbox:

@@ -38,9 +38,6 @@ RUN apt-get update && apt-get install -y \
 # Install tsx globally for TypeScript execution in execute-code endpoint
 RUN npm install -g tsx
 
-# Install Apify CLI globally for Agent access
-RUN npm install -g apify-cli
-
 # Create sandbox directory for operations
 RUN mkdir -p /sandbox && chmod 755 /sandbox
 
