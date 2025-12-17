@@ -138,6 +138,7 @@ Ask first:
 - Dockerfile changes affecting builds
 - deleting datasets or key-value stores
 - **git commits** - Only commit when explicitly requested by the user. Never commit automatically.
+- **pull requests** - Use semantic PR titles (e.g., `feat:`, `fix:`, `docs:`) and keep PR bodies brief and to the point. Focus on the "why" not the "what".
 
 ## Project Structure
 
