@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ###############################################################################
-# Integration Test for Apify Sandbox Actor
+# Integration Test for AI Sandbox Actor
 # 
 # This script:
 # 1. Starts the Actor with apify call in background
@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "==================================="
-echo "🚀 Sandbox Actor Integration Test"
+echo "🚀 AI Sandbox Integration Test"
 echo "==================================="
 echo ""
 

@@ -1,5 +1,5 @@
 /**
- * Type definitions for the Sandbox Actor
+ * Type definitions for the AI Sandbox Actor
  */
 
 export interface ActorInput {

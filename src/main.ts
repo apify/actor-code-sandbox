@@ -350,12 +350,12 @@ initializeShellServer(server);
 
 // Start server
 server.listen(port, () => {
-    log.info(`Sandbox Actor listening on port ${port}`);
+    log.info(`AI Sandbox listening on port ${port}`);
     log.info(`Server URL: ${serverUrl}`);
 
     // Print startup information
     console.log('\n=====================================');
-    console.log('🚀 Sandbox Actor Started');
+    console.log('🚀 AI Sandbox Started');
     console.log('=====================================\n');
 
     console.log('🏠 Landing page (open first):');

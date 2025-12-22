@@ -109,7 +109,7 @@ async function main(): Promise<void> {
         process.exit(1);
     }
 
-    console.log(`\n${colors.blue}Testing Sandbox Actor REST Endpoints${colors.reset}`);
+    console.log(`\n${colors.blue}Testing AI Sandbox REST Endpoints${colors.reset}`);
     console.log(`Base URL: ${baseUrl}\n`);
 
     // Test 1: Health check

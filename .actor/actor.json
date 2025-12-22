@@ -1,8 +1,8 @@
 {
     "actorSpecification": 1,
-    "name": "sandbox",
-    "title": "Isolated Sandbox Actor",
-    "description": "Isolated sandbox Actor that executes code and operations in a containerized environment for AI coding agents",
+    "name": "ai-sandbox",
+    "title": "AI Sandbox",
+    "description": "AI Sandbox Actor that allows execution of code and operations in a containerized environment for AI coding agents",
     "version": "0.0",
     "buildTag": "latest",
     "usesStandbyMode": false,
@@ -12,7 +12,7 @@
     },
     "input": {
         "title": "Actor input schema",
-        "description": "Isolated sandbox for running AI coding operations in a containerized environment. 🚀\n\n## How to use\n* **Connect with MCP client:** Use a Model Context Protocol (MCP) client to interact with this sandbox. See https://modelcontextprotocol.io/clients\n* **Use Apify SDK:** Connect programmatically using the Apify SDK for direct integration\n* **REST API:** Access the sandbox directly via REST API endpoints\n\n## Configuration\n* **Memory & timeout:** Configure run options below to set memory allocation and execution timeout\n* **Check logs:** Open the Actor run log console to view connection details and operation output",
+        "description": "AI Sandbox for running AI coding operations in a containerized environment. 🚀\n\n## How to use\n* **Connect with MCP client:** Use a Model Context Protocol (MCP) client to interact with this sandbox. See https://modelcontextprotocol.io/clients\n* **Use Apify SDK:** Connect programmatically using the Apify SDK for direct integration\n* **REST API:** Access the sandbox directly via REST API endpoints\n\n## Configuration\n* **Memory & timeout:** Configure run options below to set memory allocation and execution timeout\n* **Check logs:** Open the Actor run log console to view connection details and operation output",
         "type": "object",
         "schemaVersion": 1,
         "properties": {
@@ -39,6 +39,26 @@
             }
         },
         "required": []
+    },
+    "output": {
+        "actorOutputSchemaVersion": 1,
+
+        "title": "AI Sandbox",
+        "description": "",
+        "type": "object",
+
+        "properties": {
+            "url": {
+                "type": "string",
+                "title": "Main page",
+                "template": "{{run.containerUrl}}"
+            },
+            "shellUrl": {
+                "type": "string",
+                "title": "Shell terminal",
+                "template": "{{links.containerUrl}}/shell"
+            }
+        }
     },
     "dockerfile": "../Dockerfile"
 }

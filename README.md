@@ -1,4 +1,4 @@
-# Apify code sandbox
+# Apify AI Sandbox
 
 Isolated sandbox for running AI coding operations in a containerized environment. 🚀
 
