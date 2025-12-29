@@ -78,6 +78,10 @@ Available endpoints (all URLs come from the run logs/landing page):
     - Interactive browser terminal
     - Returns: HTML page with embedded terminal (WebSocket at `/shell/ws`)
 
+- `GET /llms.txt`
+    - Markdown documentation for LLMs (same usage info as landing page)
+    - Returns (200): Plain text Markdown with all endpoint documentation
+
 **Health status:**
 
 - `status: "initializing"` (503) – dependencies/setup still running

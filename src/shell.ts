@@ -137,7 +137,7 @@ export function getShellHTML(): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shell Terminal</title>
+    <title>Sandbox | Shell</title>
     <link rel="stylesheet" href="/xterm/xterm.css" />
     <style>
         * {

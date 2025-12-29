@@ -23,7 +23,7 @@ import {
     writeFileBinary,
 } from './operations.js';
 import { getShellHTML, initializeShellServer } from './shell.js';
-import { getLandingPageHTML } from './templates/landing.js';
+import { getLandingPageHTML, getLLMsMarkdown } from './templates/landing.js';
 import type { ActorInput } from './types.js';
 
 // Track initialization state
@@ -518,6 +518,12 @@ app.get('/', (_req: Request, res: Response) => {
             isLocalMode,
         }),
     );
+});
+
+// LLMs.txt endpoint (Markdown documentation for LLMs)
+app.get('/llms.txt', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(getLLMsMarkdown({ serverUrl }));
 });
 
 // Health check endpoint

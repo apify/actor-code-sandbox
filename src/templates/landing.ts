@@ -12,6 +12,9 @@ interface LandingPageOptions {
 const templatePath = join(dirname(fileURLToPath(import.meta.url)), 'landing.ejs');
 const landingTemplate = readFileSync(templatePath, 'utf8');
 
+const llmsTemplatePath = join(dirname(fileURLToPath(import.meta.url)), 'llms.md');
+const llmsTemplate = readFileSync(llmsTemplatePath, 'utf8');
+
 export function getLandingPageHTML({ serverUrl, isLocalMode }: LandingPageOptions): string {
     const modeLabel = isLocalMode ? 'Local mode (deps skipped)' : 'Production mode';
 
@@ -20,4 +23,8 @@ export function getLandingPageHTML({ serverUrl, isLocalMode }: LandingPageOption
         modeLabel,
         isLocalMode,
     });
+}
+
+export function getLLMsMarkdown({ serverUrl }: { serverUrl: string }): string {
+    return ejs.render(llmsTemplate, { serverUrl });
 }
