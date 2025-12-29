@@ -100,6 +100,44 @@ async function testEndpointWithOutputValidation(
     }
 }
 
+async function testFsEndpoint(
+    baseUrl: string,
+    method: string,
+    endpoint: string,
+    body: string | Uint8Array | null,
+    expectedStatus: number,
+    testName: string,
+): Promise<void> {
+    try {
+        const url = `${baseUrl}${endpoint}`;
+        const headers: HeadersInit = {};
+
+        // Set Content-Type for binary data
+        if (body instanceof Uint8Array) {
+            headers['Content-Type'] = 'application/octet-stream';
+        }
+
+        const response = await fetch(url, {
+            method,
+            headers,
+            body: (body as BodyInit) ?? undefined,
+        });
+
+        if (response.status === expectedStatus) {
+            console.log(`${colors.green}✓${colors.reset} ${testName}`);
+            results.push({ name: testName, passed: true });
+        } else {
+            const errorMsg = `Expected status ${expectedStatus}, got ${response.status}`;
+            console.log(`${colors.red}✗${colors.reset} ${testName}: ${errorMsg}`);
+            results.push({ name: testName, passed: false, error: errorMsg });
+        }
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.log(`${colors.red}✗${colors.reset} ${testName}: ${errorMsg}`);
+        results.push({ name: testName, passed: false, error: errorMsg });
+    }
+}
+
 async function main(): Promise<void> {
     const baseUrl = process.argv[2];
 
@@ -334,6 +372,229 @@ async function main(): Promise<void> {
         '/sandbox/py',
         'Execute code - Python working directory verification',
     );
+
+    // ========================================================================
+    // Filesystem Endpoints Tests (GET/PUT/POST/DELETE /fs/*)
+    // ========================================================================
+
+    // Test 28: PUT /fs/* - Create new text file
+    const testFsFile = '/test-fs-file.txt';
+    const testFsContent = 'Hello from filesystem API!';
+    await testFsEndpoint(baseUrl, 'PUT', `/fs${testFsFile}`, testFsContent, 200, 'PUT /fs/* - Create new text file');
+
+    // Test 29: GET /fs/* - Read text file
+    await testFsEndpoint(baseUrl, 'GET', `/fs${testFsFile}`, null, 200, 'GET /fs/* - Read text file');
+
+    // Test 30: PUT /fs/* - Replace existing file
+    await testFsEndpoint(
+        baseUrl,
+        'PUT',
+        `/fs${testFsFile}`,
+        'Updated content',
+        200,
+        'PUT /fs/* - Replace existing file',
+    );
+
+    // Test 31: POST /fs/* - Create directory with mkdir=1
+    const testFsDir = '/test-fs-dir';
+    await testFsEndpoint(baseUrl, 'POST', `/fs${testFsDir}?mkdir=1`, null, 201, 'POST /fs/* - Create directory');
+
+    // Test 32: POST /fs/* - Create nested directory
+    const testFsNestedDir = '/test-fs-parent/test-fs-child';
+    await testFsEndpoint(
+        baseUrl,
+        'POST',
+        `/fs${testFsNestedDir}?mkdir=1`,
+        null,
+        201,
+        'POST /fs/* - Create nested directory',
+    );
+
+    // Test 33: GET /fs/* - List directory as JSON
+    await testFsEndpoint(baseUrl, 'GET', '/fs/', null, 200, 'GET /fs/* - List root directory as JSON');
+
+    // Test 34: GET /fs/* - List nested directory
+    await testFsEndpoint(baseUrl, 'GET', '/fs/test-fs-parent', null, 200, 'GET /fs/* - List nested directory as JSON');
+
+    // Test 35: PUT /fs/* - Create file in nested directory
+    const testFsNestedFile = '/test-fs-parent/nested-file.txt';
+    await testFsEndpoint(
+        baseUrl,
+        'PUT',
+        `/fs${testFsNestedFile}`,
+        'Nested file content',
+        200,
+        'PUT /fs/* - Create file in nested directory',
+    );
+
+    // Test 36: POST /fs/* - Append to file with append=1
+    await testFsEndpoint(
+        baseUrl,
+        'POST',
+        `/fs${testFsFile}?append=1`,
+        ' Appended text!',
+        200,
+        'POST /fs/* - Append to existing file',
+    );
+
+    // Test 37: POST /fs/* - Append to non-existent file (should create)
+    const testFsAppendNewFile = '/test-fs-append-new.txt';
+    await testFsEndpoint(
+        baseUrl,
+        'POST',
+        `/fs${testFsAppendNewFile}?append=1`,
+        'Created by append',
+        200,
+        'POST /fs/* - Append to non-existent file (creates file)',
+    );
+
+    // Test 38: HEAD /fs/* - Get file metadata
+    await testFsEndpoint(baseUrl, 'HEAD', `/fs${testFsFile}`, null, 200, 'HEAD /fs/* - Get file metadata');
+
+    // Test 39: HEAD /fs/* - Get directory metadata
+    await testFsEndpoint(baseUrl, 'HEAD', `/fs${testFsDir}`, null, 200, 'HEAD /fs/* - Get directory metadata');
+
+    // Test 40: HEAD /fs/* - 404 for non-existent path
+    await testFsEndpoint(
+        baseUrl,
+        'HEAD',
+        '/fs/non-existent-xyz.txt',
+        null,
+        404,
+        'HEAD /fs/* - Non-existent file (404)',
+    );
+
+    // Test 41: GET /fs/* - 404 for non-existent file
+    await testFsEndpoint(baseUrl, 'GET', '/fs/non-existent-file-xyz.txt', null, 404, 'GET /fs/* - Non-existent file');
+
+    // Test 42: GET /fs/* - 404 for non-existent directory
+    await testFsEndpoint(baseUrl, 'GET', '/fs/non-existent-dir-xyz', null, 404, 'GET /fs/* - Non-existent directory');
+
+    // Test 43: POST /fs/* - Missing mkdir/append parameter (400)
+    await testFsEndpoint(
+        baseUrl,
+        'POST',
+        '/fs/test-missing-param',
+        'content',
+        400,
+        'POST /fs/* - Missing mkdir/append parameter',
+    );
+
+    // Test 44: POST /fs/* - Both mkdir and append (400)
+    await testFsEndpoint(
+        baseUrl,
+        'POST',
+        '/fs/test-both-params?mkdir=1&append=1',
+        'content',
+        400,
+        'POST /fs/* - Cannot use both mkdir and append',
+    );
+
+    // Test 45: DELETE /fs/* - Delete file successfully
+    await testFsEndpoint(baseUrl, 'DELETE', `/fs${testFsAppendNewFile}`, null, 200, 'DELETE /fs/* - Delete file');
+
+    // Test 46: DELETE /fs/* - Delete non-existent file (should fail)
+    await testFsEndpoint(
+        baseUrl,
+        'DELETE',
+        '/fs/non-existent-to-delete.txt',
+        null,
+        500,
+        'DELETE /fs/* - Delete non-existent file',
+    );
+
+    // Test 47: DELETE /fs/* - Delete empty directory
+    await testFsEndpoint(baseUrl, 'DELETE', `/fs${testFsDir}`, null, 200, 'DELETE /fs/* - Delete empty directory');
+
+    // Test 48: DELETE /fs/* - Delete non-empty directory without recursive (409)
+    await testFsEndpoint(
+        baseUrl,
+        'DELETE',
+        '/fs/test-fs-parent',
+        null,
+        409,
+        'DELETE /fs/* - Non-empty directory without recursive (409)',
+    );
+
+    // Test 49: DELETE /fs/* - Delete non-empty directory with recursive=1
+    await testFsEndpoint(
+        baseUrl,
+        'DELETE',
+        '/fs/test-fs-parent?recursive=1',
+        null,
+        200,
+        'DELETE /fs/* - Delete non-empty directory with recursive',
+    );
+
+    // Test 50: PUT /fs/* - Create binary-like file
+    const testFsBinaryFile = '/test-binary.bin';
+    const binaryData = new Uint8Array([0x00, 0x01, 0x02, 0xff]);
+    await testFsEndpoint(baseUrl, 'PUT', `/fs${testFsBinaryFile}`, binaryData, 200, 'PUT /fs/* - Create binary file');
+
+    // Test 51: GET /fs/* - Read binary file
+    await testFsEndpoint(baseUrl, 'GET', `/fs${testFsBinaryFile}`, null, 200, 'GET /fs/* - Read binary file');
+
+    // Test 52: DELETE /fs/* - Cleanup binary file
+    await testFsEndpoint(baseUrl, 'DELETE', `/fs${testFsBinaryFile}`, null, 200, 'DELETE /fs/* - Delete binary file');
+
+    // Test 53: POST /fs/* - Create directory that already exists (idempotent)
+    const testFsIdempotentDir = '/test-idempotent-dir';
+    await testFsEndpoint(
+        baseUrl,
+        'POST',
+        `/fs${testFsIdempotentDir}?mkdir=1`,
+        null,
+        201,
+        'POST /fs/* - Create directory (first time)',
+    );
+    await testFsEndpoint(
+        baseUrl,
+        'POST',
+        `/fs${testFsIdempotentDir}?mkdir=1`,
+        null,
+        201,
+        'POST /fs/* - Create directory (already exists, idempotent)',
+    );
+
+    // Test 54: DELETE /fs/* - Cleanup idempotent directory
+    await testFsEndpoint(
+        baseUrl,
+        'DELETE',
+        `/fs${testFsIdempotentDir}`,
+        null,
+        200,
+        'DELETE /fs/* - Delete idempotent directory',
+    );
+
+    // Test 55: GET /fs/* - Test file with special characters in name
+    const testFsSpecialFile = '/test-file-with-spaces and-special_chars.txt';
+    await testFsEndpoint(
+        baseUrl,
+        'PUT',
+        `/fs${testFsSpecialFile}`,
+        'Special filename',
+        200,
+        'PUT /fs/* - Create file with special characters',
+    );
+    await testFsEndpoint(
+        baseUrl,
+        'GET',
+        `/fs${testFsSpecialFile}`,
+        null,
+        200,
+        'GET /fs/* - Read file with special characters',
+    );
+    await testFsEndpoint(
+        baseUrl,
+        'DELETE',
+        `/fs${testFsSpecialFile}`,
+        null,
+        200,
+        'DELETE /fs/* - Delete file with special characters',
+    );
+
+    // Test 56: Cleanup - Delete test files
+    await testFsEndpoint(baseUrl, 'DELETE', `/fs${testFsFile}`, null, 200, 'Cleanup - Delete test-fs-file.txt');
 
     // Summary
     console.log(`\n${colors.blue}Test Summary${colors.reset}`);

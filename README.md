@@ -42,34 +42,43 @@ Replace `YOUR-RUN-ID` with the run ID from your Actor execution (URL is also in 
 
 Available endpoints (all URLs come from the run logs/landing page):
 
+#### Core Endpoints
+
 - `POST /mcp`
     - Body: JSON-RPC over HTTP per MCP client
     - Returns: JSON-RPC response
 
 - `POST /exec`
+    - Execute shell commands
     - Body: `{ command: string; cwd?: string; timeout?: number }`
     - Returns (200 on success, 500 on command error): `{ stdout: string; stderr: string; exitCode: number }`
 
 - `POST /execute-code`
+    - Execute JavaScript, TypeScript, or Python code
     - Body: `{ code: string; language: 'js' | 'ts' | 'py'; timeout?: number }`
     - Returns (200 on success, 500 on execution error): `{ stdout: string; stderr: string; exitCode: number; language: string }`
 
 - `POST /read-file`
+    - Read file contents as JSON
     - Body: `{ path: string }`
     - Returns (200): `{ content: string }` or (404): `{ error: string }`
 
 - `POST /write-file`
+    - Write file contents from JSON
     - Body: `{ path: string; content: string; mode?: number }`
     - Returns (200): `{ success: boolean }` or (500): `{ error: string }`
 
 - `POST /list-files`
+    - List directory contents
     - Body: `{ path?: string }`
     - Returns (200): `{ path: string; files: string[] }` or (500): `{ error: string }`
 
 - `GET /health`
+    - Health check endpoint
     - Returns (200/503): `{ status: 'healthy' | 'initializing' | 'unhealthy'; message?: string }`
 
 - `GET /shell`
+    - Interactive browser terminal
     - Returns: HTML page with embedded terminal (WebSocket at `/shell/ws`)
 
 **Health status:**
@@ -78,7 +87,168 @@ Available endpoints (all URLs come from the run logs/landing page):
 - `status: "unhealthy"` (503) – init script failed; check logs
 - `status: "healthy"` (200) – ready for requests
 
-**Call the API (TypeScript/Node):**
+#### RESTful Filesystem Endpoints
+
+Direct filesystem access using standard HTTP methods. All paths are relative to `/sandbox`.
+
+**Quick Reference:**
+
+| Method   | Endpoint              | Purpose                     | Example                       |
+| -------- | --------------------- | --------------------------- | ----------------------------- |
+| `GET`    | `/fs/{path}`          | Read file or list directory | `GET /fs/app/log.txt`         |
+| `PUT`    | `/fs/{path}`          | Write/replace file          | `PUT /fs/config.json`         |
+| `POST`   | `/fs/{path}?mkdir=1`  | Create directory            | `POST /fs/data?mkdir=1`       |
+| `POST`   | `/fs/{path}?append=1` | Append to file              | `POST /fs/log.txt?append=1`   |
+| `DELETE` | `/fs/{path}`          | Delete file/directory       | `DELETE /fs/temp?recursive=1` |
+| `HEAD`   | `/fs/{path}`          | Get metadata                | `HEAD /fs/data.json`          |
+
+**Detailed Documentation:**
+
+- `GET /fs/{path}`
+    - **Read file**: Returns raw file bytes with appropriate `Content-Type` header
+    - **List directory**: Returns JSON with directory contents (files and subdirectories with sizes)
+    - Query params:
+        - `?download=1`: Download file as attachment (or directory as ZIP)
+    - Returns (200): File content or directory JSON, (404): Path not found
+
+- `PUT /fs/{path}`
+    - **Write/replace file**: Create or replace file with request body content
+    - Accepts raw bytes or text in request body
+    - Automatically creates parent directories if they don't exist
+    - Returns (200): `{ success: true, path: string, size: number }`
+
+- `POST /fs/{path}?mkdir=1`
+    - **Create directory**: Create directory at specified path (recursive by default)
+    - Returns (201): `{ success: true, path: string, type: "directory" }`
+
+- `POST /fs/{path}?append=1`
+    - **Append to file**: Append request body to existing file (creates file if it doesn't exist)
+    - Returns (200): `{ success: true, path: string, size: number }`
+
+- `DELETE /fs/{path}`
+    - **Delete file or directory**
+    - Query params:
+        - `?recursive=1`: Enable recursive deletion for non-empty directories
+    - Returns (200): `{ success: true, path: string, deleted: true }`, (409): Directory not empty
+
+- `HEAD /fs/{path}`
+    - **Get metadata**: Returns file/directory metadata in response headers
+    - Headers: `Content-Type`, `Content-Length`, `X-File-Type`, `Last-Modified`, `X-Path`
+    - Returns (200): Headers only, (404): Path not found
+
+**Path Resolution**: All `/fs/*` paths are resolved relative to `/sandbox`:
+
+- `/fs/app/main.py` → `/sandbox/app/main.py`
+- `/fs/tmp/test.txt` → `/sandbox/tmp/test.txt`
+
+**Security**: Paths are validated to prevent escaping the `/sandbox` directory. Symlinks are followed but validated to stay within `/sandbox`.
+
+**Filesystem Examples (curl):**
+
+```bash
+# Read a file
+curl https://YOUR-RUN-ID.runs.apify.net/fs/app/config.json
+
+# List directory contents
+curl https://YOUR-RUN-ID.runs.apify.net/fs/app
+
+# Download directory as ZIP
+curl https://YOUR-RUN-ID.runs.apify.net/fs/app?download=1 -o app.zip
+
+# Upload a file
+curl -X PUT https://YOUR-RUN-ID.runs.apify.net/fs/app/config.json \
+  -H "Content-Type: application/json" \
+  -d '{"key": "value"}'
+
+# Create a directory
+curl -X POST https://YOUR-RUN-ID.runs.apify.net/fs/app/data?mkdir=1
+
+# Append to a log file
+curl -X POST https://YOUR-RUN-ID.runs.apify.net/fs/app/log.txt?append=1 \
+  -H "Content-Type: text/plain" \
+  -d "New log entry"
+
+# Delete a file
+curl -X DELETE https://YOUR-RUN-ID.runs.apify.net/fs/app/temp.txt
+
+# Delete directory recursively
+curl -X DELETE https://YOUR-RUN-ID.runs.apify.net/fs/app/temp?recursive=1
+
+# Get file metadata
+curl -I https://YOUR-RUN-ID.runs.apify.net/fs/app/data.json
+```
+
+**Upload/Download Files (TypeScript):**
+
+```ts
+const baseUrl = 'https://YOUR-RUN-ID.runs.apify.net';
+
+// Upload a file
+const uploadResponse = await fetch(`${baseUrl}/fs/app/document.pdf`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/pdf' },
+    body: pdfBuffer, // File buffer or Blob
+});
+
+// Download a file
+const downloadResponse = await fetch(`${baseUrl}/fs/app/document.pdf`);
+const fileBlob = await downloadResponse.blob();
+
+// Download directory as ZIP
+const zipResponse = await fetch(`${baseUrl}/fs/app?download=1`);
+const zipBlob = await zipResponse.blob();
+
+// List directory
+const listResponse = await fetch(`${baseUrl}/fs/app`);
+const { entries } = await listResponse.json();
+console.log(entries); // [{ name, type, size }, ...]
+
+// Create project structure
+await fetch(`${baseUrl}/fs/project/src?mkdir=1`, { method: 'POST' });
+await fetch(`${baseUrl}/fs/project/tests?mkdir=1`, { method: 'POST' });
+await fetch(`${baseUrl}/fs/project/README.md`, {
+    method: 'PUT',
+    body: '# My Project',
+});
+```
+
+**Upload/Download Files (Python):**
+
+```python
+import requests
+
+base_url = "https://YOUR-RUN-ID.runs.apify.net"
+
+# Upload a file
+with open('document.pdf', 'rb') as f:
+    resp = requests.put(f"{base_url}/fs/app/document.pdf",
+                       data=f,
+                       headers={'Content-Type': 'application/pdf'})
+    resp.raise_for_status()
+
+# Download a file
+resp = requests.get(f"{base_url}/fs/app/document.pdf")
+with open('downloaded.pdf', 'wb') as f:
+    f.write(resp.content)
+
+# Download directory as ZIP
+resp = requests.get(f"{base_url}/fs/app?download=1")
+with open('app.zip', 'wb') as f:
+    f.write(resp.content)
+
+# List directory
+resp = requests.get(f"{base_url}/fs/app")
+data = resp.json()
+for entry in data['entries']:
+    print(f"{entry['name']} ({entry['type']}) - {entry.get('size', 'N/A')} bytes")
+
+# Create project structure
+requests.post(f"{base_url}/fs/project/src?mkdir=1")
+requests.post(f"{base_url}/fs/project/tests?mkdir=1")
+requests.put(f"{base_url}/fs/project/README.md", data=b"# My Project")
+```
+
+**Code Execution Examples (TypeScript/Node):**
 
 ```ts
 const baseUrl = 'https://YOUR-RUN-ID.runs.apify.net';
@@ -91,7 +261,7 @@ const json = await res.json();
 console.log(json);
 ```
 
-**Call the API (Python):**
+**Code Execution Examples (Python):**
 
 ```python
 import requests

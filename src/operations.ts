@@ -4,8 +4,11 @@ import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import type { Readable } from 'node:stream';
 
+import archiver from 'archiver';
 import { log } from 'apify';
+import mime from 'mime-types';
 
 import { JS_TS_CODE_DIR, PYTHON_CODE_DIR, SANDBOX_DIR } from './consts.js';
 import { getExecutionEnvironment } from './environment.js';
@@ -25,6 +28,34 @@ const resolveDirectoryPath = (dirPath?: string): string => {
         return dirPath;
     }
     return path.join(SANDBOX_DIR, dirPath);
+};
+
+/**
+ * Resolve and validate file path relative to SANDBOX_DIR
+ * Ensures the resolved path stays within /sandbox directory
+ * @param filePath - The file path to resolve
+ * @returns Resolved absolute path
+ * @throws Error if path attempts to escape /sandbox
+ */
+const resolveAndValidatePath = async (filePath: string): Promise<string> => {
+    // Resolve path relative to SANDBOX_DIR if not absolute
+    const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(SANDBOX_DIR, filePath);
+
+    // Resolve symlinks and normalize path to get the real path
+    let realPath: string;
+    try {
+        realPath = await fs.realpath(resolvedPath);
+    } catch (error) {
+        // If file doesn't exist yet, use normalized path
+        realPath = path.normalize(resolvedPath);
+    }
+
+    // Ensure the path is within SANDBOX_DIR
+    if (!realPath.startsWith(SANDBOX_DIR)) {
+        throw new Error(`Access denied: Path ${filePath} resolves outside of sandbox`);
+    }
+
+    return realPath;
 };
 
 /**
@@ -298,5 +329,394 @@ export const executeCode = async (
                 log.debug('Failed to clean up temp file', { path: tempFile });
             }
         }
+    }
+};
+
+/**
+ * Get file or directory metadata
+ */
+export const statPath = async (
+    filePath: string,
+): Promise<{
+    path: string;
+    type: 'file' | 'directory';
+    size?: number;
+    mtime?: Date;
+    exists: boolean;
+    error?: string;
+}> => {
+    log.debug('statPath called', { path: filePath });
+    try {
+        const resolvedPath = await resolveAndValidatePath(filePath);
+        const stats = await fs.stat(resolvedPath);
+
+        log.debug('statPath succeeded', { path: resolvedPath, type: stats.isDirectory() ? 'directory' : 'file' });
+        return {
+            path: resolvedPath,
+            type: stats.isDirectory() ? 'directory' : 'file',
+            size: stats.isDirectory() ? undefined : stats.size,
+            mtime: stats.mtime,
+            exists: true,
+        };
+    } catch (error) {
+        const err = error as Error;
+        log.debug('statPath failed', { path: filePath, error: err.message });
+        return {
+            path: filePath,
+            type: 'file',
+            exists: false,
+            error: err.message,
+        };
+    }
+};
+
+/**
+ * Read file contents as Buffer (for binary files)
+ */
+export const readFileBinary = async (
+    filePath: string,
+): Promise<{
+    content?: Buffer;
+    path: string;
+    size?: number;
+    mimeType?: string;
+    error?: string;
+}> => {
+    log.debug('readFileBinary called', { path: filePath });
+    try {
+        const resolvedPath = await resolveAndValidatePath(filePath);
+        const content = await fs.readFile(resolvedPath);
+        const mimeType = mime.lookup(resolvedPath) || 'application/octet-stream';
+
+        log.debug('readFileBinary succeeded', { path: resolvedPath, size: content.length, mimeType });
+        return {
+            content,
+            path: resolvedPath,
+            size: content.length,
+            mimeType,
+        };
+    } catch (error) {
+        const err = error as Error;
+        log.debug('readFileBinary failed', { path: filePath, error: err.message });
+        return {
+            path: filePath,
+            error: err.message,
+        };
+    }
+};
+
+/**
+ * Write file contents (supports both string and Buffer)
+ */
+export const writeFileBinary = async (
+    filePath: string,
+    content: string | Buffer,
+    mode?: number,
+): Promise<{
+    success: boolean;
+    path: string;
+    size?: number;
+    error?: string;
+}> => {
+    log.debug('writeFileBinary called', { path: filePath, contentLength: content.length, mode });
+    try {
+        // Resolve path relative to /sandbox if it's a relative path
+        const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(SANDBOX_DIR, filePath);
+
+        // Validate path is within sandbox (before file exists)
+        const normalizedPath = path.normalize(resolvedPath);
+        if (!normalizedPath.startsWith(SANDBOX_DIR)) {
+            throw new Error(`Access denied: Path ${filePath} resolves outside of sandbox`);
+        }
+
+        // Ensure directory exists
+        const dir = path.dirname(normalizedPath);
+        await fs.mkdir(dir, { recursive: true });
+
+        // Write the file
+        await fs.writeFile(normalizedPath, content);
+
+        // Set file mode if specified
+        if (mode) {
+            await fs.chmod(normalizedPath, mode);
+        }
+
+        const size = Buffer.isBuffer(content) ? content.length : Buffer.byteLength(content, 'utf8');
+
+        log.debug('writeFileBinary succeeded', { path: normalizedPath, size });
+        return {
+            success: true,
+            path: normalizedPath,
+            size,
+        };
+    } catch (error) {
+        const err = error as Error;
+        log.debug('writeFileBinary failed', { path: filePath, error: err.message });
+        return {
+            success: false,
+            path: filePath,
+            error: err.message,
+        };
+    }
+};
+
+/**
+ * Append content to a file
+ */
+export const appendFile = async (
+    filePath: string,
+    content: string | Buffer,
+): Promise<{
+    success: boolean;
+    path: string;
+    size?: number;
+    error?: string;
+}> => {
+    log.debug('appendFile called', { path: filePath, contentLength: content.length });
+    try {
+        // Resolve path relative to /sandbox if it's a relative path
+        const resolvedPath = path.isAbsolute(filePath) ? filePath : path.join(SANDBOX_DIR, filePath);
+
+        // Validate path is within sandbox
+        const normalizedPath = path.normalize(resolvedPath);
+        if (!normalizedPath.startsWith(SANDBOX_DIR)) {
+            throw new Error(`Access denied: Path ${filePath} resolves outside of sandbox`);
+        }
+
+        // Ensure directory exists
+        const dir = path.dirname(normalizedPath);
+        await fs.mkdir(dir, { recursive: true });
+
+        // Append to the file
+        await fs.appendFile(normalizedPath, content);
+
+        // Get final size
+        const stats = await fs.stat(normalizedPath);
+
+        log.debug('appendFile succeeded', { path: normalizedPath, size: stats.size });
+        return {
+            success: true,
+            path: normalizedPath,
+            size: stats.size,
+        };
+    } catch (error) {
+        const err = error as Error;
+        log.debug('appendFile failed', { path: filePath, error: err.message });
+        return {
+            success: false,
+            path: filePath,
+            error: err.message,
+        };
+    }
+};
+
+/**
+ * Create a directory
+ */
+export const createDirectory = async (
+    dirPath: string,
+): Promise<{
+    success: boolean;
+    path: string;
+    error?: string;
+}> => {
+    log.debug('createDirectory called', { path: dirPath });
+    try {
+        // Resolve path relative to /sandbox if it's a relative path
+        const resolvedPath = path.isAbsolute(dirPath) ? dirPath : path.join(SANDBOX_DIR, dirPath);
+
+        // Validate path is within sandbox
+        const normalizedPath = path.normalize(resolvedPath);
+        if (!normalizedPath.startsWith(SANDBOX_DIR)) {
+            throw new Error(`Access denied: Path ${dirPath} resolves outside of sandbox`);
+        }
+
+        // Create directory recursively
+        await fs.mkdir(normalizedPath, { recursive: true });
+
+        log.debug('createDirectory succeeded', { path: normalizedPath });
+        return {
+            success: true,
+            path: normalizedPath,
+        };
+    } catch (error) {
+        const err = error as Error;
+        log.debug('createDirectory failed', { path: dirPath, error: err.message });
+        return {
+            success: false,
+            path: dirPath,
+            error: err.message,
+        };
+    }
+};
+
+/**
+ * Delete a file or directory
+ */
+export const deleteFileOrDirectory = async (
+    filePath: string,
+    recursive = false,
+): Promise<{
+    success: boolean;
+    path: string;
+    error?: string;
+}> => {
+    log.debug('deleteFileOrDirectory called', { path: filePath, recursive });
+    try {
+        const resolvedPath = await resolveAndValidatePath(filePath);
+
+        // Check if path exists and get its type
+        const stats = await fs.stat(resolvedPath);
+
+        if (stats.isDirectory()) {
+            if (!recursive) {
+                // Check if directory is empty
+                const entries = await fs.readdir(resolvedPath);
+                if (entries.length > 0) {
+                    throw new Error('Directory not empty. Use recursive=true to delete non-empty directories.');
+                }
+                // Use rmdir for empty directories (avoids EISDIR error)
+                await fs.rmdir(resolvedPath);
+            } else {
+                // Use rm with recursive flag for non-empty directories
+                await fs.rm(resolvedPath, { recursive: true, force: false });
+            }
+        } else {
+            await fs.unlink(resolvedPath);
+        }
+
+        log.debug('deleteFileOrDirectory succeeded', { path: resolvedPath });
+        return {
+            success: true,
+            path: resolvedPath,
+        };
+    } catch (error) {
+        const err = error as Error;
+        log.debug('deleteFileOrDirectory failed', { path: filePath, error: err.message });
+        return {
+            success: false,
+            path: filePath,
+            error: err.message,
+        };
+    }
+};
+
+/**
+ * List files in directory with size information and sorting
+ */
+export const listFilesDetailed = async (
+    dirPath?: string,
+): Promise<{
+    path: string;
+    type: 'directory';
+    entries: {
+        name: string;
+        type: 'file' | 'directory';
+        size?: number;
+    }[];
+    error?: string;
+}> => {
+    log.debug('listFilesDetailed called', { path: dirPath });
+    try {
+        // Use /sandbox as default, or resolve relative paths relative to /sandbox
+        const targetPath = resolveDirectoryPath(dirPath);
+
+        // Validate path is within sandbox
+        const resolvedPath = await resolveAndValidatePath(targetPath);
+
+        const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
+
+        // Get size information for files
+        const entriesWithSize = await Promise.all(
+            entries.map(async (entry) => {
+                const fullPath = path.join(resolvedPath, entry.name);
+                let size: number | undefined;
+                if (entry.isFile()) {
+                    try {
+                        const stats = await fs.stat(fullPath);
+                        size = stats.size;
+                    } catch {
+                        size = undefined;
+                    }
+                }
+                return {
+                    name: entry.name,
+                    type: entry.isDirectory() ? ('directory' as const) : ('file' as const),
+                    size,
+                };
+            }),
+        );
+
+        // Sort alphabetically by name (case-insensitive), like ls default
+        entriesWithSize.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+
+        log.debug('listFilesDetailed succeeded', { path: resolvedPath, entryCount: entriesWithSize.length });
+        return {
+            path: resolvedPath,
+            type: 'directory',
+            entries: entriesWithSize,
+        };
+    } catch (error) {
+        const err = error as Error;
+        const targetPath = resolveDirectoryPath(dirPath);
+        log.debug('listFilesDetailed failed', { path: targetPath, error: err.message });
+        return {
+            path: targetPath,
+            type: 'directory',
+            entries: [],
+            error: err.message,
+        };
+    }
+};
+
+/**
+ * Create a ZIP archive of a directory and return as stream
+ */
+export const createZipArchive = async (
+    dirPath: string,
+): Promise<{
+    stream?: Readable;
+    path: string;
+    error?: string;
+}> => {
+    log.debug('createZipArchive called', { path: dirPath });
+    try {
+        const resolvedPath = await resolveAndValidatePath(dirPath);
+
+        // Check if path is a directory
+        const stats = await fs.stat(resolvedPath);
+        if (!stats.isDirectory()) {
+            throw new Error('Path is not a directory');
+        }
+
+        // Create archive
+        const archive = archiver('zip', {
+            zlib: { level: 6 }, // Compression level
+        });
+
+        // Add error handling for the archive
+        archive.on('error', (err) => {
+            log.error('Archive error', { error: err.message });
+            throw err;
+        });
+
+        // Add directory contents to archive
+        archive.directory(resolvedPath, false);
+
+        // Finalize the archive (this is important!)
+        void archive.finalize();
+
+        log.debug('createZipArchive succeeded', { path: resolvedPath });
+        return {
+            stream: archive,
+            path: resolvedPath,
+        };
+    } catch (error) {
+        const err = error as Error;
+        log.debug('createZipArchive failed', { path: dirPath, error: err.message });
+        return {
+            path: dirPath,
+            error: err.message,
+        };
     }
 };

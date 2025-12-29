@@ -113,17 +113,6 @@
         </section>
 
         <section class="card">
-            <h3>REST endpoints</h3>
-            <ul class="list">
-                <li><code>POST <%= serverUrl %>/exec</code> – run shell commands</li>
-                <li><code>POST <%= serverUrl %>/execute-code</code> – run JS/TS/Python</li>
-                <li><code>POST <%= serverUrl %>/read-file</code> – read a file</li>
-                <li><code>POST <%= serverUrl %>/write-file</code> – write a file</li>
-                <li><code>POST <%= serverUrl %>/list-files</code> – list a directory</li>
-            </ul>
-        </section>
-
-        <section class="card">
             <h3>Code examples</h3>
             
             <p class="example-label">Call the API (TypeScript/Node)</p>
@@ -150,6 +139,41 @@ resp = requests.post(f"{base_url}/execute-code", json=payload, timeout=15)
 resp.raise_for_status()
 print(resp.json())</pre>
             </div>
+        </section>
+
+        <section class="card">
+            <h3>Core REST endpoints</h3>
+            <ul class="list">
+                <li><code>POST <%= serverUrl %>/exec</code> – run shell commands
+                    <br><span style="color: #64748b; font-size: 13px;">Body: { command: "ls -la", cwd: "/sandbox", timeout: 5000 }</span></li>
+                <li><code>POST <%= serverUrl %>/execute-code</code> – run JS/TS/Python
+                    <br><span style="color: #64748b; font-size: 13px;">Body: { code: "print('hello')", language: "py", timeout: 10000 }</span></li>
+                <li><code>POST <%= serverUrl %>/read-file</code> – read a file
+                    <br><span style="color: #64748b; font-size: 13px;">Body: { path: "/sandbox/config.json" }</span></li>
+                <li><code>POST <%= serverUrl %>/write-file</code> – write a file
+                    <br><span style="color: #64748b; font-size: 13px;">Body: { path: "/sandbox/output.txt", content: "data" }</span></li>
+                <li><code>POST <%= serverUrl %>/list-files</code> – list a directory
+                    <br><span style="color: #64748b; font-size: 13px;">Body: { path: "/sandbox" }</span></li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h3>Filesystem endpoints</h3>
+            <p class="muted" style="margin-bottom: 12px;">Direct file operations using RESTful HTTP methods. All paths relative to /sandbox.</p>
+            <ul class="list">
+                    <li><code>GET <%= serverUrl %>/fs/{path}</code> – read file or list directory
+                        <br><span style="color: #64748b; font-size: 13px;">Example: GET /fs/app/log.txt or GET /fs/app?download=1 (ZIP)</span></li>
+                    <li><code>PUT <%= serverUrl %>/fs/{path}</code> – write/replace file (raw body)
+                        <br><span style="color: #64748b; font-size: 13px;">Example: PUT /fs/config.json with JSON body</span></li>
+                    <li><code>POST <%= serverUrl %>/fs/{path}?mkdir=1</code> – create directory
+                        <br><span style="color: #64748b; font-size: 13px;">Example: POST /fs/project/src?mkdir=1</span></li>
+                    <li><code>POST <%= serverUrl %>/fs/{path}?append=1</code> – append to file (raw body)
+                        <br><span style="color: #64748b; font-size: 13px;">Example: POST /fs/log.txt?append=1 with text body</span></li>
+                    <li><code>DELETE <%= serverUrl %>/fs/{path}</code> – delete file or directory
+                        <br><span style="color: #64748b; font-size: 13px;">Example: DELETE /fs/temp?recursive=1</span></li>
+                    <li><code>HEAD <%= serverUrl %>/fs/{path}</code> – get file metadata (headers only)
+                        <br><span style="color: #64748b; font-size: 13px;">Example: HEAD /fs/data.json (returns Content-Type, Size, etc.)</span></li>
+            </ul>
         </section>
     </main>
 
