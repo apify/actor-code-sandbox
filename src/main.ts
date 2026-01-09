@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import http, { createServer } from 'node:http';
+import { dirname, join } from 'node:path';
 import type { Duplex } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { Actor, log } from 'apify';
@@ -54,7 +56,7 @@ log.info('Actor input retrieved', {
     mode: isLocalMode ? 'local' : 'production',
     hasNodeDependencies: !!input?.nodeDependencies && Object.keys(input.nodeDependencies).length > 0,
     hasPythonRequirements: !!input?.pythonRequirementsTxt?.trim().length,
-    hasInitScript: !!input?.initScript?.trim().length,
+    hasInitScript: !!input?.initShellScript?.trim().length,
 });
 
 // Setup execution environment with dependencies
@@ -76,9 +78,9 @@ if (!setupResult.success) {
 }
 
 // Execute init script if provided and not empty
-if (input?.initScript && input.initScript.trim().length > 0) {
+if (input?.initShellScript && input.initShellScript.trim().length > 0) {
     log.info('Executing init script...');
-    const initResult = await executeInitScript(input.initScript);
+    const initResult = await executeInitScript(input.initShellScript);
     if (initResult.exitCode !== 0) {
         log.error('Init script failed', {
             exitCode: initResult.exitCode,
@@ -542,6 +544,14 @@ app.get('/', (_req: Request, res: Response) => {
             isLocalMode,
         }),
     );
+});
+
+// Favicon endpoint
+app.get('/favicon.ico', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'image/x-icon');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const faviconPath = join(dirname(fileURLToPath(import.meta.url)), 'templates', 'favicon.ico');
+    res.sendFile(faviconPath);
 });
 
 // LLMs.txt endpoint (Markdown documentation for LLMs)

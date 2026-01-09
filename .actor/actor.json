@@ -30,7 +30,7 @@
                 "editor": "textarea",
                 "prefill": ""
             },
-            "initScript": {
+            "initShellScript": {
                 "title": "Initialization Script",
                 "type": "string",
                 "description": "Optional bash script to customize the sandbox environment. Runs after library installation in /sandbox directory. Use for installing system packages, creating directories, or other setup tasks.",

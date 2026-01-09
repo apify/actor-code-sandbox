@@ -394,6 +394,40 @@ async function runAllTests(baseUrl: string): Promise<void> {
     // Health check
     await testEndpoint(baseUrl, 'GET', '/health', null, 200, 'Health check (GET /health)');
 
+    // ========================================================================
+    // Init Script Verification
+    // ========================================================================
+
+    // Verify init script created the directory and file
+    await testFsEndpoint(
+        baseUrl,
+        'GET',
+        '/fs/test-e2e-init/status.txt',
+        null,
+        200,
+        'Init script - Verify status file exists',
+    );
+
+    // Verify init script file content
+    try {
+        const url = `${baseUrl}/fs/test-e2e-init/status.txt`;
+        const response = await fetch(url);
+        const content = await response.text();
+
+        if (response.status === 200 && content.includes('E2E test init script executed')) {
+            console.log(`${colors.green}✓${colors.reset} Init script - Verify file content`);
+            results.push({ name: 'Init script - Verify file content', passed: true });
+        } else {
+            const errorMsg = `Expected content to contain "E2E test init script executed", got: "${content}"`;
+            console.log(`${colors.red}✗${colors.reset} Init script - Verify file content: ${errorMsg}`);
+            results.push({ name: 'Init script - Verify file content', passed: false, error: errorMsg });
+        }
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.log(`${colors.red}✗${colors.reset} Init script - Verify file content: ${errorMsg}`);
+        results.push({ name: 'Init script - Verify file content', passed: false, error: errorMsg });
+    }
+
     // Execute command - success
     await testEndpoint(
         baseUrl,
@@ -810,7 +844,7 @@ async function main(): Promise<void> {
                 zod: '^3.22.0',
             },
             pythonRequirementsTxt: 'numpy>=1.24.0',
-            initScript:
+            initShellScript:
                 "#!/bin/bash\nmkdir -p /sandbox/test-e2e-init\necho 'E2E test init script executed' > /sandbox/test-e2e-init/status.txt",
         };
 

@@ -21,7 +21,7 @@ export interface ActorInput {
      * Optional bash script to customize the sandbox environment
      * Runs after dependency installation in /sandbox directory
      */
-    initScript?: string;
+    initShellScript?: string;
 
     /**
      * Graceful shutdown timeout in seconds if no activity is detected.
