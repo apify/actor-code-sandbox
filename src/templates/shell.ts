@@ -49,12 +49,22 @@ echo ""
 echo -e "\${BOLD}Welcome to Apify AI Sandbox!\${NC}"
 echo ""
 echo -e "\${GREEN}System Info:\${NC}"
-echo -e "  - Node.js:    \$(node -v 2>/dev/null || echo 'not installed')"
-echo -e "  - Python:     \$(python3 --version 2>&1 || echo 'not installed')"
-echo -e "  - Apify CLI:  \$(apify --version 2>/dev/null || echo 'not installed')"
-echo -e "  - MCP CLI:    \$(mcpc --version 2>/dev/null || echo 'not installed') (https://github.com/apify/mcp-cli)"
-echo -e "  - Claude:     \$(claude --version 2>/dev/null || echo 'not installed')"
-echo -e "  - OpenCode:   \$(opencode --version 2>/dev/null || echo 'not installed')"
+
+# Read versions from cached files (fallback to runtime check if not found)
+VERSION_DIR="/app/.versions"
+NODE_VER=\$(cat "\$VERSION_DIR/node.txt" 2>/dev/null || node -v 2>/dev/null || echo 'not installed')
+PYTHON_VER=\$(cat "\$VERSION_DIR/python.txt" 2>/dev/null || python3 --version 2>&1 || echo 'not installed')
+APIFY_VER=\$(cat "\$VERSION_DIR/apify.txt" 2>/dev/null || apify --version 2>/dev/null || echo 'not installed')
+MCPC_VER=\$(cat "\$VERSION_DIR/mcpc.txt" 2>/dev/null || mcpc --version 2>/dev/null || echo 'not installed')
+CLAUDE_VER=\$(cat "\$VERSION_DIR/claude.txt" 2>/dev/null || claude --version 2>/dev/null || echo 'not installed')
+OPENCODE_VER=\$(cat "\$VERSION_DIR/opencode.txt" 2>/dev/null || opencode --version 2>/dev/null || echo 'not installed')
+
+echo -e "  - Node.js:    \$NODE_VER"
+echo -e "  - Python:     \$PYTHON_VER"
+echo -e "  - Apify CLI:  \$APIFY_VER"
+echo -e "  - MCP CLI:    \$MCPC_VER (https://github.com/apify/mcp-cli)"
+echo -e "  - Claude:     \$CLAUDE_VER"
+echo -e "  - OpenCode:   \$OPENCODE_VER"
 echo -e "  - CWD:        \$(pwd)"
 if [ -n "\$VIRTUAL_ENV" ]; then
     echo -e "  - Venv:     Active (\$VIRTUAL_ENV)"

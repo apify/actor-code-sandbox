@@ -87,6 +87,10 @@ COPY --from=builder /build/.opencode/opencode.json /root/.config/opencode/openco
 # Install production dependencies only
 RUN npm install --production
 
+# Capture tool versions at build time for fast shell startup
+COPY scripts/capture-versions.sh /tmp/capture-versions.sh
+RUN chmod +x /tmp/capture-versions.sh && /tmp/capture-versions.sh && rm /tmp/capture-versions.sh
+
 # Run as root user (required for sandbox execution)
 USER root
 

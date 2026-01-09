@@ -273,6 +273,9 @@ Ask first:
 ```
 .actor/
 ├── actor.json                    # Actor configuration (name, version, input schema)
+scripts/
+└── capture-versions.sh           # Build-time version capture script (runs in Dockerfile)
+                                  # Caches tool versions to /app/.versions/*.txt for fast shell startup
 src/
 ├── main.ts                       # Express HTTP server & Actor initialization
 ├── mcp.ts                        # Model Context Protocol (MCP) server
