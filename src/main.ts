@@ -691,6 +691,7 @@ const spawnTtyd = () => {
     const ttyd = spawn('ttyd', ['-p', shellPort.toString(), '-W', 'bash', '--rcfile', '/app/sandbox_bashrc'], {
         stdio: 'ignore',
         cwd: SANDBOX_DIR,
+        env: process.env,
     });
 
     ttyd.on('error', (err) => {
