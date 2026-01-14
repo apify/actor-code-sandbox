@@ -85,6 +85,12 @@ RUN mkdir -p /sandbox/js-ts && chmod 755 /sandbox/js-ts && \
 # Copy AGENTS.md to sandbox for AI coding agents
 COPY --from=builder /build/artifacts/AGENTS.md /sandbox/AGENTS.md
 
+# Capture baseline package state for migration persistence
+RUN mkdir -p /app && \
+    /sandbox/py/venv/bin/pip freeze > /app/.baseline-pip-freeze.txt && \
+    dpkg --get-selections > /app/.baseline-dpkg.txt && \
+    echo "Baseline package state captured"
+
 # Set working directory
 WORKDIR /app
 

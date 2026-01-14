@@ -1,0 +1,510 @@
+/**
+ * Migration Persistence Module
+ *
+ * Handles Actor state persistence across Apify platform migrations.
+ * This module tracks filesystem changes, package installations, and
+ * restores the complete Actor state after resurrection.
+ */
+
+import { exec } from 'node:child_process';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { promisify } from 'node:util';
+
+import { Actor, log } from 'apify';
+
+import {
+    BASELINE_PIP_FREEZE,
+    JS_TS_CODE_DIR,
+    KV_MIGRATION_MANIFEST,
+    KV_MIGRATION_TARBALL,
+    MIGRATION_EXCLUDED_PATHS,
+    PYTHON_BIN_DIR,
+    STARTUP_MARKER_PATH,
+} from './consts.js';
+
+const execAsync = promisify(exec);
+
+/**
+ * Migration manifest structure
+ */
+export interface MigrationManifest {
+    version: number;
+    createdAt: string;
+    actorRunId: string | null;
+    startupTimestamp: number;
+    packages: {
+        apt: string[];
+        pip: string[];
+    };
+    changedFiles: {
+        count: number;
+        totalSize: number;
+        paths: string[];
+    };
+}
+
+/**
+ * Initialize persistence system by creating startup marker
+ */
+export const initializePersistence = (): void => {
+    try {
+        writeFileSync(STARTUP_MARKER_PATH, '');
+        log.info('Persistence initialized - startup marker created', { path: STARTUP_MARKER_PATH });
+    } catch (error) {
+        log.error('Failed to create startup marker', { error: (error as Error).message });
+        throw error;
+    }
+};
+
+/**
+ * Find all files that have been modified since Actor startup
+ * @returns Array of file paths that have changed
+ */
+export const findChangedFiles = async (): Promise<string[]> => {
+    log.info('Finding changed files since startup...');
+
+    if (!existsSync(STARTUP_MARKER_PATH)) {
+        log.warning('Startup marker not found, cannot determine changed files');
+        return [];
+    }
+
+    try {
+        // Build find command with excluded paths
+        const excludeArgs = MIGRATION_EXCLUDED_PATHS.map((p) => `-path '${p}' -prune -o`).join(' ');
+
+        // Find all files newer than marker, excluding virtual filesystems and regenerable directories
+        const command = `find / -xdev ${excludeArgs} -type f -newer ${STARTUP_MARKER_PATH} -print 2>/dev/null || true`;
+
+        log.debug('Running find command', { command });
+        const { stdout } = await execAsync(command, {
+            maxBuffer: 50 * 1024 * 1024, // 50 MB buffer for long file lists
+            timeout: 30000, // 30 second timeout
+        });
+
+        const files = stdout
+            .trim()
+            .split('\n')
+            .filter((f) => f.length > 0)
+            .filter((f) => {
+                // Additional filtering for excluded paths (in case find didn't catch everything)
+                return !MIGRATION_EXCLUDED_PATHS.some((excluded) => f.startsWith(excluded));
+            });
+
+        log.info('Found changed files', { count: files.length });
+
+        if (files.length > 0) {
+            log.debug('Sample of changed files', { sample: files.slice(0, 10) });
+        }
+
+        return files;
+    } catch (error) {
+        log.error('Error finding changed files', { error: (error as Error).message });
+        return [];
+    }
+};
+
+/**
+ * Parse APT history log to get list of installed packages
+ * @returns Array of package names
+ */
+export const parseAptHistory = (): string[] => {
+    const aptHistoryPath = '/var/log/apt/history.log';
+
+    if (!existsSync(aptHistoryPath)) {
+        log.debug('APT history log not found, no packages to restore');
+        return [];
+    }
+
+    try {
+        const content = readFileSync(aptHistoryPath, 'utf-8');
+        const packages = new Set<string>();
+
+        // Parse log file for Install: lines
+        const lines = content.split('\n');
+        for (const line of lines) {
+            if (line.startsWith('Install:')) {
+                // Extract package names from "Install: pkg1:arch (version), pkg2:arch (version), ..."
+                const pkgLine = line.substring('Install:'.length).trim();
+                const pkgMatches = pkgLine.matchAll(/([a-z0-9][a-z0-9+.-]+):[a-z0-9]+\s+\([^)]+\)/gi);
+
+                for (const match of pkgMatches) {
+                    packages.add(match[1]);
+                }
+            }
+        }
+
+        const packageList = Array.from(packages);
+        log.info('Parsed APT history', { packageCount: packageList.length });
+
+        if (packageList.length > 0) {
+            log.debug('APT packages to reinstall', { packages: packageList });
+        }
+
+        return packageList;
+    } catch (error) {
+        log.error('Error parsing APT history', { error: (error as Error).message });
+        return [];
+    }
+};
+
+/**
+ * Generate list of pip packages to reinstall (excluding baseline)
+ * @returns Array of package specifications (name==version)
+ */
+export const generatePipFreeze = async (): Promise<string[]> => {
+    const pipBinary = `${PYTHON_BIN_DIR}/pip`;
+
+    if (!existsSync(pipBinary)) {
+        log.debug('Pip binary not found, no Python packages to backup');
+        return [];
+    }
+
+    try {
+        // Get current pip freeze
+        const { stdout } = await execAsync(`${pipBinary} freeze`, { timeout: 10000 });
+        const currentPackages = new Set(
+            stdout
+                .trim()
+                .split('\n')
+                .filter((p) => p.length > 0),
+        );
+
+        // Load baseline packages if available
+        let baselinePackages = new Set<string>();
+        if (existsSync(BASELINE_PIP_FREEZE)) {
+            const baseline = readFileSync(BASELINE_PIP_FREEZE, 'utf-8');
+            baselinePackages = new Set(
+                baseline
+                    .trim()
+                    .split('\n')
+                    .filter((p) => p.length > 0),
+            );
+        }
+
+        // Filter out baseline packages (only keep newly installed)
+        const newPackages = Array.from(currentPackages).filter((pkg) => !baselinePackages.has(pkg));
+
+        log.info('Generated pip freeze', {
+            total: currentPackages.size,
+            baseline: baselinePackages.size,
+            new: newPackages.length,
+        });
+
+        if (newPackages.length > 0) {
+            log.debug('New pip packages to backup', { packages: newPackages.slice(0, 10) });
+        }
+
+        return newPackages;
+    } catch (error) {
+        log.error('Error generating pip freeze', { error: (error as Error).message });
+        return [];
+    }
+};
+
+/**
+ * Generate package manifests for all package managers
+ */
+export const generatePackageManifests = async (): Promise<MigrationManifest['packages']> => {
+    log.info('Generating package manifests...');
+
+    const [apt, pip] = await Promise.all([Promise.resolve(parseAptHistory()), generatePipFreeze()]);
+
+    return { apt, pip };
+};
+
+/**
+ * Create tarball from list of changed files
+ * @param files - Array of file paths to include
+ * @returns Path to created tarball
+ */
+export const createMigrationTarball = async (files: string[]): Promise<string> => {
+    const tarballPath = '/tmp/migration-state.tar.gz';
+
+    log.info('Creating migration tarball...', { fileCount: files.length });
+
+    if (files.length === 0) {
+        log.warning('No files to backup, creating empty tarball');
+        // Create minimal empty tarball
+        writeFileSync(tarballPath, '');
+        return tarballPath;
+    }
+
+    try {
+        // Write file list to temp file for tar command
+        const fileListPath = '/tmp/migration-files.txt';
+        writeFileSync(fileListPath, files.join('\n'));
+
+        // Create tarball using native tar command (preserves permissions and ownership)
+        const tarCommand = `tar -czf ${tarballPath} -P --files-from=${fileListPath} 2>/dev/null || true`;
+
+        await execAsync(tarCommand, {
+            timeout: 60000, // 60 second timeout
+            maxBuffer: 10 * 1024 * 1024, // 10 MB buffer
+        });
+
+        if (!existsSync(tarballPath)) {
+            throw new Error('Tarball creation failed - file not created');
+        }
+
+        const stats = statSync(tarballPath);
+        log.info('Tarball created successfully', {
+            path: tarballPath,
+            size: stats.size,
+            sizeMB: (stats.size / (1024 * 1024)).toFixed(2),
+        });
+
+        return tarballPath;
+    } catch (error) {
+        log.error('Error creating tarball', { error: (error as Error).message });
+        throw error;
+    }
+};
+
+/**
+ * Save migration state to Key-Value Store
+ */
+export const saveMigrationState = async (): Promise<void> => {
+    log.info('Starting migration state save...');
+
+    try {
+        // Step 1: Find changed files and generate package manifests in parallel
+        const [changedFiles, packages] = await Promise.all([findChangedFiles(), generatePackageManifests()]);
+
+        // Calculate total size of changed files
+        let totalSize = 0;
+        for (const file of changedFiles) {
+            try {
+                const stats = statSync(file);
+                totalSize += stats.size;
+            } catch {
+                // File may have been deleted, skip
+            }
+        }
+
+        // Step 2: Build manifest
+        const manifest: MigrationManifest = {
+            version: 1,
+            createdAt: new Date().toISOString(),
+            actorRunId: process.env.ACTOR_RUN_ID || null,
+            startupTimestamp: statSync(STARTUP_MARKER_PATH).mtimeMs,
+            packages,
+            changedFiles: {
+                count: changedFiles.length,
+                totalSize,
+                paths: changedFiles,
+            },
+        };
+
+        log.info('Migration manifest prepared', {
+            files: manifest.changedFiles.count,
+            sizeMB: (totalSize / (1024 * 1024)).toFixed(2),
+            aptPackages: manifest.packages.apt.length,
+            pipPackages: manifest.packages.pip.length,
+        });
+
+        // Step 3: Create tarball
+        const tarballPath = await createMigrationTarball(changedFiles);
+
+        // Step 4: Upload tarball to KV store
+        const tarballBuffer = readFileSync(tarballPath);
+        await Actor.setValue(KV_MIGRATION_TARBALL, tarballBuffer, { contentType: 'application/gzip' });
+
+        log.info('Tarball uploaded to KV store', { key: KV_MIGRATION_TARBALL, size: tarballBuffer.length });
+
+        // Step 5: Upload manifest
+        await Actor.setValue(KV_MIGRATION_MANIFEST, manifest);
+
+        log.info('Migration state saved successfully', {
+            manifestKey: KV_MIGRATION_MANIFEST,
+            tarballKey: KV_MIGRATION_TARBALL,
+        });
+    } catch (error) {
+        log.error('Failed to save migration state', { error: (error as Error).message });
+        // Don't throw - let Actor shutdown continue
+    }
+};
+
+/**
+ * Reinstall packages from manifest
+ * @param packages - Package manifest
+ */
+export const reinstallPackages = async (packages: MigrationManifest['packages']): Promise<void> => {
+    log.info('Reinstalling packages...', {
+        apt: packages.apt.length,
+        pip: packages.pip.length,
+    });
+
+    // Reinstall APT packages
+    if (packages.apt.length > 0) {
+        try {
+            log.info(`Reinstalling ${packages.apt.length} APT packages...`);
+
+            // Log packages in readable chunks (10 per line)
+            const chunkSize = 10;
+            for (let i = 0; i < packages.apt.length; i += chunkSize) {
+                const chunk = packages.apt.slice(i, i + chunkSize);
+                log.info(
+                    `  APT packages [${i + 1}-${Math.min(i + chunkSize, packages.apt.length)}]: ${chunk.join(', ')}`,
+                );
+            }
+
+            // Update package lists first
+            log.info('Running apt-get update...');
+            const { stdout: updateStdout, stderr: updateStderr } = await execAsync('apt-get update', {
+                timeout: 60000,
+                env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' },
+            });
+
+            if (updateStdout) {
+                log.debug('apt-get update completed');
+            }
+
+            if (updateStderr) {
+                log.debug('apt-get update stderr', { stderr: updateStderr });
+            }
+
+            // Install packages
+            const aptCommand = `apt-get install -y ${packages.apt.join(' ')}`;
+            log.info('Running apt-get install...');
+
+            await execAsync(aptCommand, {
+                timeout: 300000, // 5 minute timeout
+                env: { ...process.env, DEBIAN_FRONTEND: 'noninteractive' },
+            });
+
+            log.info(`Successfully reinstalled ${packages.apt.length} APT packages`);
+        } catch (error) {
+            log.error('Failed to reinstall APT packages', {
+                error: (error as Error).message,
+                count: packages.apt.length,
+            });
+            // Log first 20 packages that failed
+            if (packages.apt.length > 0) {
+                const sample = packages.apt.slice(0, 20);
+                log.error(`Failed packages (first 20 of ${packages.apt.length}): ${sample.join(', ')}`);
+            }
+            // Continue with pip even if apt fails
+        }
+    }
+
+    // Reinstall PIP packages
+    if (packages.pip.length > 0) {
+        try {
+            log.info(`Reinstalling ${packages.pip.length} PIP packages...`);
+
+            // Log packages in readable chunks (5 per line - pip package names can be long)
+            const chunkSize = 5;
+            for (let i = 0; i < packages.pip.length; i += chunkSize) {
+                const chunk = packages.pip.slice(i, i + chunkSize);
+                log.info(
+                    `  PIP packages [${i + 1}-${Math.min(i + chunkSize, packages.pip.length)}]: ${chunk.join(', ')}`,
+                );
+            }
+
+            // Write to temp requirements file
+            const requirementsPath = '/tmp/restore-requirements.txt';
+            writeFileSync(requirementsPath, packages.pip.join('\n'));
+
+            // Install from requirements
+            const pipBinary = `${PYTHON_BIN_DIR}/pip`;
+            const pipCommand = `${pipBinary} install -r ${requirementsPath}`;
+            log.info('Running pip install...');
+
+            await execAsync(pipCommand, { timeout: 300000 });
+
+            log.info(`Successfully reinstalled ${packages.pip.length} PIP packages`);
+        } catch (error) {
+            log.error('Failed to reinstall PIP packages', {
+                error: (error as Error).message,
+                count: packages.pip.length,
+            });
+            // Log first 10 packages that failed
+            if (packages.pip.length > 0) {
+                const sample = packages.pip.slice(0, 10);
+                log.error(`Failed packages (first 10 of ${packages.pip.length}): ${sample.join(', ')}`);
+            }
+        }
+    }
+
+    // NPM packages are handled by package.json restoration from tarball
+    // Just run npm install if package.json exists
+    if (existsSync(`${JS_TS_CODE_DIR}/package.json`)) {
+        try {
+            log.info('Reinstalling NPM packages from package.json...');
+
+            await execAsync('npm install', {
+                cwd: JS_TS_CODE_DIR,
+                timeout: 300000, // 5 minute timeout
+            });
+
+            log.info('NPM packages reinstalled successfully');
+        } catch (error) {
+            log.error('Failed to reinstall NPM packages', { error: (error as Error).message });
+        }
+    }
+};
+
+/**
+ * Restore migration state from Key-Value Store
+ * @returns true if state was restored, false if no state found
+ */
+export const restoreMigrationState = async (): Promise<boolean> => {
+    log.info('Checking for migration state...');
+
+    try {
+        // Step 1: Check if manifest exists
+        const manifest = await Actor.getValue<MigrationManifest>(KV_MIGRATION_MANIFEST);
+
+        if (!manifest) {
+            log.info('No migration state found, starting fresh');
+            return false;
+        }
+
+        log.info('Found migration state, restoring...', {
+            createdAt: manifest.createdAt,
+            files: manifest.changedFiles.count,
+            aptPackages: manifest.packages.apt.length,
+            pipPackages: manifest.packages.pip.length,
+        });
+
+        // Step 2: Download tarball
+        const tarballBuffer = await Actor.getValue<Buffer>(KV_MIGRATION_TARBALL);
+
+        if (!tarballBuffer) {
+            log.error('Migration manifest found but tarball missing');
+            return false;
+        }
+
+        log.info('Tarball downloaded from KV store', { size: tarballBuffer.length });
+
+        // Step 3: Write tarball to temp file
+        const tarballPath = '/tmp/restore-migration.tar.gz';
+        writeFileSync(tarballPath, tarballBuffer);
+
+        // Step 4: Extract tarball to root
+        if (manifest.changedFiles.count > 0) {
+            log.info('Extracting tarball to root filesystem...');
+
+            // Extract using native tar command (preserves permissions and ownership)
+            const extractCommand = `tar -xzf ${tarballPath} -C / -P 2>/dev/null || true`;
+
+            await execAsync(extractCommand, {
+                timeout: 60000, // 60 second timeout
+            });
+
+            log.info('Tarball extracted successfully');
+        } else {
+            log.info('No files to restore (empty tarball)');
+        }
+
+        // Step 5: Reinstall packages
+        await reinstallPackages(manifest.packages);
+
+        log.info('Migration state restored successfully');
+
+        return true;
+    } catch (error) {
+        log.error('Failed to restore migration state', { error: (error as Error).message });
+        return false;
+    }
+};

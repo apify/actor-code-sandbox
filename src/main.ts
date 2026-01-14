@@ -26,6 +26,7 @@ import {
     statPath,
     writeFileBinary,
 } from './operations.js';
+import { initializePersistence, restoreMigrationState, saveMigrationState } from './persistence.js';
 import { getLandingPageHTML, getLLMsMarkdown } from './templates/landing.js';
 import { SANDBOX_BASHRC, WELCOME_SCRIPT } from './templates/shell.js';
 import type { ActorInput } from './types.js';
@@ -59,12 +60,33 @@ log.info('Actor input retrieved', {
     hasInitScript: !!input?.initShellScript?.trim().length,
 });
 
-// Setup execution environment with dependencies
-log.info('Setting up execution environment...');
-const setupResult = await setupExecutionEnvironment({
-    nodeDependencies: input?.nodeDependencies,
-    pythonRequirementsTxt: input?.pythonRequirementsTxt,
-});
+// Check for migration state and restore if available
+let restoredFromMigration = false;
+if (!isLocalMode) {
+    log.info('Checking for migration state to restore...');
+    restoredFromMigration = await restoreMigrationState();
+
+    if (restoredFromMigration) {
+        log.info('Successfully restored from migration state');
+    }
+}
+
+// Setup execution environment with dependencies (skip if restored from migration)
+let setupResult;
+if (restoredFromMigration) {
+    log.info('Skipping dependency installation (already restored from migration)');
+    setupResult = {
+        success: true,
+        nodeSetup: { installed: [], failed: [] },
+        pythonSetup: { installed: [], failed: [] },
+    };
+} else {
+    log.info('Setting up execution environment...');
+    setupResult = await setupExecutionEnvironment({
+        nodeDependencies: input?.nodeDependencies,
+        pythonRequirementsTxt: input?.pythonRequirementsTxt,
+    });
+}
 
 if (!setupResult.success) {
     log.warning('Some dependencies failed to install', {
@@ -105,6 +127,27 @@ if (!isLocalMode) {
     } catch (err) {
         log.error('Failed to write shell environment files', { error: (err as Error).message });
     }
+}
+
+// Initialize persistence system (create startup marker for tracking changes)
+if (!isLocalMode && !restoredFromMigration) {
+    try {
+        initializePersistence();
+    } catch (err) {
+        log.error('Failed to initialize persistence system', { error: (err as Error).message });
+    }
+}
+
+// Register migration event handler
+if (!isLocalMode) {
+    Actor.on('migrating', async () => {
+        log.info('Migration event received, saving Actor state...');
+        try {
+            await saveMigrationState();
+        } catch (err) {
+            log.error('Failed to save migration state', { error: (err as Error).message });
+        }
+    });
 }
 
 // Mark initialization as complete
