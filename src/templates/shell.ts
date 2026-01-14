@@ -71,6 +71,7 @@ if [ -n "\$VIRTUAL_ENV" ]; then
 fi
 echo ""
 echo -e "\${BLUE}Documentation:\${NC}"
+echo -e "  - Homepage:          https://apify.com/apify/ai-sandbox"
 echo -e "  - Git repo:          https://github.com/apify/actor-ai-sandbox"
 echo -e "  - AI tools:          Claude Code & OpenCode configured with Apify OpenRouter"
 echo -e "  - Apify OpenRouter:  https://apify.com/apify/openrouter"

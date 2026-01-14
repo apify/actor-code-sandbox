@@ -44,11 +44,28 @@ export const initializeCodeDirectories = async (): Promise<void> => {
 
 /**
  * Initialize Node.js execution environment
- * Creates code directories first, then node_modules directory inside js-ts
+ * Checks if environment is already set up (from Dockerfile) before creating
  */
 export const initializeNodeEnvironment = async (): Promise<void> => {
     log.debug('Initializing Node.js environment');
     try {
+        // Check if environment is already set up (from Dockerfile)
+        const packageJsonPath = path.join(JS_TS_CODE_DIR, 'package.json');
+        const nodeModulesPath = EXECUTION_DIRS.NODE_MODULES;
+
+        try {
+            await fs.stat(packageJsonPath);
+            await fs.stat(nodeModulesPath);
+            log.info('Node.js environment already set up (pre-installed from Dockerfile)', {
+                path: JS_TS_CODE_DIR,
+                nodeModules: nodeModulesPath,
+            });
+            return;
+        } catch {
+            // Environment not fully set up, create it
+            log.debug('Node.js environment not found, creating...');
+        }
+
         // Initialize code directories first
         await initializeCodeDirectories();
 
@@ -56,40 +73,15 @@ export const initializeNodeEnvironment = async (): Promise<void> => {
         await fs.mkdir(EXECUTION_DIRS.NODE_MODULES, { recursive: true, mode: 0o755 });
         log.debug('Node modules directory created', { path: EXECUTION_DIRS.NODE_MODULES });
 
-        // Create package.json in js-ts directory if it doesn't exist
-        const packageJsonPath = path.join(JS_TS_CODE_DIR, 'package.json');
-        try {
-            await fs.stat(packageJsonPath);
-            log.debug('package.json already exists', { path: packageJsonPath });
-        } catch {
-            // Create minimal package.json
-            const packageJson = {
-                name: 'apify-sandbox-js-ts',
-                version: '1.0.0',
-                description: 'Sandbox for JS/TS code execution',
-                type: 'module',
-            };
-            await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2));
-            log.debug('Created package.json', { path: packageJsonPath });
-        }
-
-        // Create package-lock.json if it doesn't exist
-        const packageLockPath = path.join(JS_TS_CODE_DIR, 'package-lock.json');
-        try {
-            await fs.stat(packageLockPath);
-            log.debug('package-lock.json already exists', { path: packageLockPath });
-        } catch {
-            // Create minimal package-lock.json
-            const packageLock = {
-                name: 'apify-sandbox-js-ts',
-                version: '1.0.0',
-                lockfileVersion: 3,
-                requires: true,
-                packages: {},
-            };
-            await fs.writeFile(packageLockPath, JSON.stringify(packageLock, null, 2));
-            log.debug('Created package-lock.json', { path: packageLockPath });
-        }
+        // Create package.json
+        const packageJson = {
+            name: 'apify-sandbox-js-ts',
+            version: '1.0.0',
+            description: 'Sandbox for JS/TS code execution',
+            type: 'module',
+        };
+        await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2));
+        log.debug('Created package.json', { path: packageJsonPath });
 
         log.info('Node.js environment initialized successfully');
     } catch (error) {
@@ -101,20 +93,23 @@ export const initializeNodeEnvironment = async (): Promise<void> => {
 
 /**
  * Initialize Python virtual environment
- * Creates code directories first, then creates a Python venv in the sandbox directory
+ * Checks if venv is already set up (from Dockerfile) before creating
  */
 export const initializePythonEnvironment = async (): Promise<void> => {
     log.debug('Initializing Python virtual environment');
     try {
-        // Check if venv already exists
+        // Check if venv already exists (pre-installed from Dockerfile)
         try {
             await fs.stat(EXECUTION_DIRS.PYTHON_VENV);
-            log.debug('Python venv already exists', { path: EXECUTION_DIRS.PYTHON_VENV });
-            // Ensure code directories exist even if venv already exists
-            await initializeCodeDirectories();
+            await fs.stat(PYTHON_CODE_DIR);
+            log.info('Python venv already set up (pre-installed from Dockerfile)', {
+                path: EXECUTION_DIRS.PYTHON_VENV,
+                codeDir: PYTHON_CODE_DIR,
+            });
             return;
         } catch {
             // venv doesn't exist, create it
+            log.debug('Python venv not found, creating...');
         }
 
         // Initialize code directories first
@@ -150,6 +145,7 @@ export const initializePythonEnvironment = async (): Promise<void> => {
 
 /**
  * Install Node.js libraries via npm
+ * Note: apify-client is pre-installed from Dockerfile
  * Dependencies object format: { "package-name": "version", ... }
  * Example: { "zod": "^3.0", "axios": "latest" }
  */
@@ -202,6 +198,7 @@ export const installNodeLibraries = async (
 
 /**
  * Install Python libraries via pip
+ * Note: apify-client is pre-installed from Dockerfile
  * Requirements format: requirements.txt style string with one package per line
  * Example: "requests==2.31.0\npandas>=2.0.0\nnumpy"
  */

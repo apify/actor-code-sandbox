@@ -47,6 +47,7 @@ RUN apt-get update && apt-get install -y \
     libwebsockets-dev \
     libsecret-1-0 \
     procps \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Install tsx globally for TypeScript execution in execute-code endpoint
@@ -67,6 +68,23 @@ RUN curl -fsSL https://opencode.ai/install | bash
 # Create sandbox directory for operations
 RUN mkdir -p /sandbox && chmod 755 /sandbox
 
+# Create Python sandbox directory with venv and pre-install apify-client
+RUN mkdir -p /sandbox/py && chmod 755 /sandbox/py && \
+    python3 -m venv /sandbox/py/venv && \
+    /sandbox/py/venv/bin/pip install --upgrade pip && \
+    /sandbox/py/venv/bin/pip install apify-client && \
+    echo "apify-client pre-installed in Python venv"
+
+# Create JS/TS sandbox directory with proper package.json and pre-install apify-client
+RUN mkdir -p /sandbox/js-ts && chmod 755 /sandbox/js-ts && \
+    cd /sandbox/js-ts && \
+    echo '{"name":"apify-sandbox-js-ts","version":"1.0.0","description":"Sandbox for JS/TS code execution","type":"module","dependencies":{"apify-client":"*"}}' > package.json && \
+    npm install && \
+    echo "apify-client pre-installed in Node.js environment"
+
+# Copy AGENTS.md to sandbox for AI coding agents
+COPY --from=builder /build/artifacts/AGENTS.md /sandbox/AGENTS.md
+
 # Set working directory
 WORKDIR /app
 
@@ -82,7 +100,7 @@ COPY --from=builder /build/package-lock.json /app/package-lock.json
 
 # Copy OpenCode configuration
 RUN mkdir -p /root/.config/opencode
-COPY --from=builder /build/config-opencode/opencode.json /root/.config/opencode/opencode.json
+COPY --from=builder /build/artifacts/opencode.json /root/.config/opencode/opencode.json
 
 # Install production dependencies only
 RUN npm install --production

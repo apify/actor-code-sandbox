@@ -33,10 +33,10 @@ Use a Model Context Protocol (MCP) client to interact with this sandbox. See [mo
 **Connect with Claude Code:**
 
 ```bash
-claude mcp add --transport http sandbox https://YOUR-RUN-ID.runs.apify.net/mcp
+claude mcp add --transport http sandbox https://UNIQUE-ID.runs.apify.net/mcp
 ```
 
-Replace `YOUR-RUN-ID` with the run ID from your Actor execution (URL is also in the landing page and logs). Then prompt your agent; it will use the sandbox tools automatically over MCP.
+Replace `UNIQUE-ID` with the run ID from your Actor execution (URL is also in the landing page and logs). Then prompt your agent; it will use the sandbox tools automatically over MCP.
 
 ### REST API
 
@@ -120,41 +120,41 @@ Direct filesystem access using standard HTTP methods. All paths are relative to 
 
 ```bash
 # Read a file
-curl https://YOUR-RUN-ID.runs.apify.net/fs/app/config.json
+curl https://UNIQUE-ID.runs.apify.net/fs/app/config.json
 
 # List directory contents
-curl https://YOUR-RUN-ID.runs.apify.net/fs/app
+curl https://UNIQUE-ID.runs.apify.net/fs/app
 
 # Download directory as ZIP
-curl https://YOUR-RUN-ID.runs.apify.net/fs/app?download=1 -o app.zip
+curl https://UNIQUE-ID.runs.apify.net/fs/app?download=1 -o app.zip
 
 # Upload a file
-curl -X PUT https://YOUR-RUN-ID.runs.apify.net/fs/app/config.json \
+curl -X PUT https://UNIQUE-ID.runs.apify.net/fs/app/config.json \
   -H "Content-Type: application/json" \
   -d '{"key": "value"}'
 
 # Create a directory
-curl -X POST https://YOUR-RUN-ID.runs.apify.net/fs/app/data?mkdir=1
+curl -X POST https://UNIQUE-ID.runs.apify.net/fs/app/data?mkdir=1
 
 # Append to a log file
-curl -X POST https://YOUR-RUN-ID.runs.apify.net/fs/app/log.txt?append=1 \
+curl -X POST https://UNIQUE-ID.runs.apify.net/fs/app/log.txt?append=1 \
   -H "Content-Type: text/plain" \
   -d "New log entry"
 
 # Delete a file
-curl -X DELETE https://YOUR-RUN-ID.runs.apify.net/fs/app/temp.txt
+curl -X DELETE https://UNIQUE-ID.runs.apify.net/fs/app/temp.txt
 
 # Delete directory recursively
-curl -X DELETE https://YOUR-RUN-ID.runs.apify.net/fs/app/temp?recursive=1
+curl -X DELETE https://UNIQUE-ID.runs.apify.net/fs/app/temp?recursive=1
 
 # Get file metadata
-curl -I https://YOUR-RUN-ID.runs.apify.net/fs/app/data.json
+curl -I https://UNIQUE-ID.runs.apify.net/fs/app/data.json
 ```
 
 **Upload/download files (TypeScript):**
 
 ```ts
-const baseUrl = 'https://YOUR-RUN-ID.runs.apify.net';
+const baseUrl = 'https://UNIQUE-ID.runs.apify.net';
 
 // Upload a file
 const uploadResponse = await fetch(`${baseUrl}/fs/app/document.pdf`, {
@@ -190,7 +190,7 @@ await fetch(`${baseUrl}/fs/project/README.md`, {
 ```python
 import requests
 
-base_url = "https://YOUR-RUN-ID.runs.apify.net"
+base_url = "https://UNIQUE-ID.runs.apify.net"
 
 # Upload a file
 with open('document.pdf', 'rb') as f:
@@ -224,7 +224,7 @@ requests.put(f"{base_url}/fs/project/README.md", data=b"# My Project")
 **Code execution examples (TypeScript/Node):**
 
 ```ts
-const baseUrl = 'https://YOUR-RUN-ID.runs.apify.net';
+const baseUrl = 'https://UNIQUE-ID.runs.apify.net';
 
 // Execute Python code
 const codeRes = await fetch(`${baseUrl}/exec`, {
@@ -256,7 +256,7 @@ console.log(await shellRes.json());
 ```python
 import requests
 
-base_url = "https://YOUR-RUN-ID.runs.apify.net"
+base_url = "https://UNIQUE-ID.runs.apify.net"
 
 # Execute Python code
 payload = {"command": "print('hello from python')", "language": "py", "timeoutSecs": 10}
