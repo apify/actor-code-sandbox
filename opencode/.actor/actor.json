@@ -1,8 +1,8 @@
 {
   "actorSpecification": 1,
-  "name": "claude-code",
-  "title": "Claude Code",
-  "description": "Instant access to Claude Code - Anthropic's AI coding assistant running on Apify",
+  "name": "opencode",
+  "title": "OpenCode",
+  "description": "Instant access to OpenCode - Open-source AI coding assistant running on Apify",
   "version": "0.0",
   "buildTag": "latest",
   "usesStandbyMode": false,
@@ -11,7 +11,7 @@
   },
   "input": {
     "title": "Actor input schema",
-    "description": "Just run the Actor and use Claude Code with Apify. The Claude Code window will automatically open in the Actor run console.",
+    "description": "Just run the Actor and use OpenCode with Apify. The OpenCode window will automatically open in the Actor run console.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
@@ -37,7 +37,7 @@
   "output": {
     "actorOutputSchemaVersion": 1,
 
-    "title": "Claude Code",
+    "title": "OpenCode",
     "description": "",
     "type": "object",
 
@@ -45,7 +45,7 @@
       "url": {
         "type": "string",
         "title": "Main page",
-        "template": "{{run.containerUrl}}/shell?arg=-c&arg=source%20/app/sandbox_bashrc%3B%20claude"
+        "template": "{{run.containerUrl}}/shell?arg=-c&arg=source%20/app/sandbox_bashrc%3B%20opencode"
       }
     }
   },
