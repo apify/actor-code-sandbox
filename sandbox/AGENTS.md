@@ -293,6 +293,60 @@ Dockerfile                        # Container image definition
 AGENTS.md                         # AI agent instructions (this file)
 ```
 
+## Interactive Shell Terminal
+
+The Actor provides an interactive browser-based terminal powered by [ttyd](https://github.com/tsl0922/ttyd) that runs bash in the sandbox environment.
+
+### Basic Usage
+
+Access the terminal at:
+
+```
+GET /shell/
+```
+
+This opens an interactive bash session with:
+
+- Custom environment variables (NODE_PATH, VIRTUAL_ENV, PATH)
+- Installed dependencies (Node.js, Python, Apify CLI, Claude Code, etc.)
+- Working directory set to `/sandbox`
+
+### URL Argument Passing
+
+You can pass arguments to bash via URL query parameters using the `?arg=` syntax:
+
+```
+GET /shell?arg=-c&arg=<command>
+```
+
+This executes a one-off command instead of opening an interactive session.
+
+**Examples:**
+
+```bash
+# Run a simple command
+GET /shell?arg=-c&arg=echo hello
+
+# Run cowsay
+GET /shell?arg=-c&arg=cowsay hello
+
+# Execute a script
+GET /shell?arg=-c&arg=python script.py
+
+# Run Node.js code
+GET /shell?arg=-c&arg=node -e "console.log('hello')"
+```
+
+**Implementation Details:**
+
+- ttyd is spawned with the `-a` flag to enable URL argument acceptance
+- The proxy normalizes paths to ensure query strings like `?arg=...` are correctly formatted as `/?arg=...`
+- Arguments are passed directly to bash, so bash syntax applies (e.g., `-c` requires the command as the next argument)
+
+**Security Note:**
+
+URL arguments are passed directly to bash without additional validation. Only use this feature with trusted input.
+
 ## Actor Input Schema
 
 The input schema defines the input parameters for an Actor. It's a JSON object comprising various field types supported by the Apify platform.
