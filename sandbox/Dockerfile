@@ -48,7 +48,31 @@ RUN apt-get update && apt-get install -y \
     libsecret-1-0 \
     procps \
     jq \
+    xvfb \
+    x11vnc \
+    websockify \
+    openbox \
+    dbus-x11 \
+    fonts-liberation \
+    xdg-utils \
+    libgtk-3-0t64 \
+    libdbus-glib-1-2 \
+    libasound2t64 \
+    libx11-xcb1 \
+    libxtst6 \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Firefox from Mozilla CDN (Ubuntu 24.04 only provides snap)
+RUN curl -L -o /tmp/firefox.tar.xz \
+    "https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=en-US" && \
+    tar -xJf /tmp/firefox.tar.xz -C /opt && \
+    ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
+    rm /tmp/firefox.tar.xz
+
+# Install noVNC and websockify for browser access
+RUN git clone --depth 1 https://github.com/novnc/noVNC.git /opt/noVNC && \
+    git clone --depth 1 https://github.com/novnc/websockify /opt/noVNC/utils/websockify && \
+    ln -s /opt/noVNC/vnc.html /opt/noVNC/index.html
 
 # Install tsx globally for TypeScript execution in execute-code endpoint
 RUN npm install -g tsx
@@ -103,6 +127,10 @@ COPY --from=builder /usr/local/bin/ttyd /usr/local/bin/ttyd
 # Copy package.json and production node_modules from builder
 COPY --from=builder /build/package.json /app/package.json
 COPY --from=builder /build/package-lock.json /app/package-lock.json
+
+# Copy VNC startup script
+COPY scripts/start-vnc.sh /app/start-vnc.sh
+RUN chmod +x /app/start-vnc.sh
 
 # Copy OpenCode configuration
 RUN mkdir -p /root/.config/opencode

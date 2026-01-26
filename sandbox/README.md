@@ -8,6 +8,7 @@ Isolated sandbox for running AI coding operations in a containerized environment
 - **🤖 AI agent development:** Provide isolated and managed development environments where AI agents can code, test, and execute operations securely
 - **📦 Sandboxed operations:** Execute system commands, file operations, and custom scripts in a contained environment
 - **🖥️ Interactive debugging:** Access the sandbox via browser-based shell terminal for real-time exploration and troubleshooting
+- **🌐 Interactive browser:** Use the integrated Firefox browser (via noVNC) to interact with local web apps, test UIs, and debug frontend applications visually
 - **🔗 Apify Actor orchestration:** Agents can access the limited permissions Apify token (available as `APIFY_TOKEN` env var) to run other [limited permissions Actors](https://docs.apify.com/platform/actors/development/permissions), process or analyze their output, and build complex data pipelines by combining results from multiple Actors
 
 ## Quickstart
@@ -62,6 +63,11 @@ Available endpoints (all URLs come from the run logs/landing page):
 - `GET /shell/`
     - Interactive browser terminal
     - Returns: Interactive terminal powered by ttyd
+
+- `GET /browser/vnc.html?autoconnect=true`
+    - In-browser Firefox via noVNC
+    - Returns: Interactive VNC client with autoconnect to Firefox
+    - Supports full browser automation and UI testing
 
 - `GET /llms.txt`
     - Markdown documentation for LLMs (same usage info as landing page)
@@ -274,6 +280,31 @@ print(resp.json())
 ### Interactive shell terminal
 
 Open the interactive shell terminal URL from the run logs (also linked on the landing page) to work directly in the browser.
+
+### Interactive browser (Firefox via noVNC)
+
+Access Firefox directly in your browser to interact with local web applications and test UIs. The browser runs in a virtual display within the container and is accessible via noVNC WebSocket connection.
+
+**Use cases:**
+- Test local web apps running in the container
+- Interact with UIs visually for debugging and development
+- Verify frontend behavior in real-time
+- Quick visual inspection of services
+
+**Connect:**
+```
+https://UNIQUE-ID.runs.apify.net/browser/vnc.html?autoconnect=true
+```
+
+The browser starts ready to navigate. Launch your local web server in the container and open it in Firefox to test.
+
+**Example workflow:**
+```bash
+# In a code execution or shell session, start a local server:
+npx http-server /sandbox/frontend -p 8000
+
+# Then open http://localhost:8000 in the browser at /browser/vnc.html
+```
 
 ## Configuration
 

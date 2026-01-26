@@ -722,6 +722,39 @@ app.post('/exec', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// Browser (noVNC) Implementation
+// ============================================================================
+const browserPort = 6080;
+
+// Spawn VNC stack process
+const spawnVncStack = () => {
+    log.info('Spawning VNC browser stack...');
+
+    const vnc = spawn('/app/start-vnc.sh', [], {
+        stdio: 'ignore',
+        cwd: SANDBOX_DIR,
+        env: process.env,
+    });
+
+    vnc.on('error', (err) => {
+        log.error('Failed to start VNC stack', { error: err.message });
+    });
+
+    vnc.on('exit', (code) => {
+        log.warning('VNC stack exited', { code });
+        setTimeout(spawnVncStack, 5000);
+    });
+};
+
+if (!isLocalMode) {
+    // Spawn VNC stack in background - it takes ~5-8 seconds to fully initialize
+    setTimeout(() => {
+        log.info('Starting VNC browser stack');
+        spawnVncStack();
+    }, 1000);
+}
+
+// ============================================================================
 // Shell (ttyd) Implementation
 // ============================================================================
 const shellPort = 7681;
@@ -783,16 +816,47 @@ app.all('/shell*', (req, res) => {
     req.pipe(proxyReq);
 });
 
+// HTTP Proxy for browser (noVNC) - using http-proxy library
+const browserHttpProxy = httpProxy.createProxyServer({
+    target: `http://127.0.0.1:${browserPort}`,
+});
+
+browserHttpProxy.on('error', (err, _req, res) => {
+    log.error('Browser HTTP proxy error', { error: err.message });
+    if (res && 'writeHead' in res && !res.headersSent) {
+        res.writeHead(502, { 'Content-Type': 'text/plain' });
+        res.end('Browser service not ready');
+    }
+});
+
+// Route handler for /browser/* - rewrite URL and proxy
+app.all('/browser*', (req, res) => {
+    // Rewrite path: /browser/foo → /foo
+    req.url = req.url.replace(/^\/browser/, '') || '/';
+    if (req.url.startsWith('?')) {
+        req.url = '/' + req.url;
+    }
+
+    log.info('Proxying browser HTTP request', { url: req.url });
+    browserHttpProxy.web(req, res);
+});
+
 // Manual WebSocket Proxy for ttyd
 const wsProxy = httpProxy.createProxyServer({
     target: `http://127.0.0.1:${shellPort}`,
     ws: true,
 });
 
+// WebSocket Proxy for browser
+const browserWsProxy = httpProxy.createProxyServer({
+    target: `http://127.0.0.1:${browserPort}`,
+    ws: true,
+});
+
 server.on('upgrade', (req, socket, head) => {
     if (req.url?.startsWith('/shell')) {
         req.url = req.url.replace(/^\/shell/, '') || '/';
-        log.info('Proxying WebSocket upgrade', { url: req.url });
+        log.info('Proxying shell WebSocket upgrade', { url: req.url });
 
         // Track activity on WebSocket data
         socket.on('data', () => {
@@ -800,6 +864,16 @@ server.on('upgrade', (req, socket, head) => {
         });
 
         wsProxy.ws(req, socket as Duplex, head);
+    } else if (req.url?.startsWith('/browser')) {
+        req.url = req.url.replace(/^\/browser/, '') || '/';
+        log.info('Proxying browser WebSocket upgrade', { url: req.url });
+
+        // Track activity on WebSocket data
+        socket.on('data', () => {
+            lastActivityAt = Date.now();
+        });
+
+        browserWsProxy.ws(req, socket as Duplex, head);
     }
 });
 
@@ -820,6 +894,10 @@ server.listen(port, () => {
     // Shell terminal endpoint
     console.log(`   GET ${serverUrl}/shell/`);
     console.log(`       Interactive shell terminal\n`);
+
+    // Browser endpoint
+    console.log(`   GET ${serverUrl}/browser/vnc.html?autoconnect=true`);
+    console.log(`       In-browser Firefox via noVNC\n`);
 
     // MCP Server URL
     console.log('📡 MCP Server Endpoint:');
