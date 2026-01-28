@@ -108,6 +108,7 @@ RUN mkdir -p /sandbox/js-ts && chmod 755 /sandbox/js-ts && \
 
 # Copy AGENTS.md to sandbox for AI coding agents
 COPY --from=builder /build/artifacts/AGENTS.md /sandbox/AGENTS.md
+COPY --from=builder /build/artifacts/AGENTS.md /sandbox/CLAUDE.md
 
 # Capture baseline package state for migration persistence
 RUN mkdir -p /app && \
@@ -141,6 +142,15 @@ RUN npm install --production
 
 # Add local bin to PATH for CLI tools (Claude at ~/.local/bin, OpenCode at ~/.opencode/bin)
 ENV PATH="/root/.local/bin:/root/.opencode/bin:$PATH"
+
+# Set IS_SANDBOX environment variable globally
+ENV IS_SANDBOX=1
+
+# Set Claude Code max output tokens to 64000
+ENV CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000
+
+# Add bash alias for claude to skip permissions by default
+RUN echo 'alias claude="claude --dangerously-skip-permissions"' >> /root/.bashrc
 
 # Capture tool versions at build time for fast shell startup
 COPY scripts/capture-versions.sh /tmp/capture-versions.sh

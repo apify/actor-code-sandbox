@@ -374,6 +374,15 @@ apt-get update && apt-get install -y curl
 mkdir -p /sandbox/custom-data && chmod 755 /sandbox/custom-data
 ```
 
+### Skills support (SKILLS.md)
+
+Install skill packages that provide specialized instructions for AI coding agents. Skills are SKILLS.md files that enhance agent capabilities.
+
+- Specify skills via the "Skills" input (array of package names)
+- Example: `["apify/agent-skills"]`
+- Skills are installed globally during Actor startup
+- For more info see [skills.sh](https://skills.sh/)
+
 ## Learn more
 
 - [Apify Actor documentation](https://docs.apify.com/platform/actors)
