@@ -149,8 +149,9 @@ ENV IS_SANDBOX=1
 # Set Claude Code max output tokens to 64000
 ENV CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000
 
-# Add bash alias for claude to skip permissions by default
-RUN echo 'alias claude="claude --dangerously-skip-permissions"' >> /root/.bashrc
+# Configure Claude Code to bypass permissions
+RUN mkdir -p /root/.claude && \
+    echo '{"permissions": {"defaultMode": "bypassPermissions"}}' > /root/.claude/settings.json
 
 # Capture tool versions at build time for fast shell startup
 COPY scripts/capture-versions.sh /tmp/capture-versions.sh
