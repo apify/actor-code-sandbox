@@ -147,7 +147,7 @@ ENV PATH="/root/.local/bin:/root/.opencode/bin:$PATH"
 ENV IS_SANDBOX=1
 
 # Set Claude Code max output tokens to 64000
-ENV CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000
+ENV CLAUDE_CODE_MAX_OUTPUT_TOKENS=128000
 
 # Configure Claude Code to bypass permissions
 RUN mkdir -p /root/.claude && \
