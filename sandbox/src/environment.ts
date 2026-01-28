@@ -258,15 +258,62 @@ export const installPythonLibraries = async (
 };
 
 /**
+ * Install skills via npx skills CLI
+ * Skills are SKILL.md files that provide specialized instructions for AI agents
+ * Uses: npx -y skills add --global --yes --all <skill>
+ */
+export const installSkills = async (
+    skills: string[] | undefined,
+): Promise<{
+    success: boolean;
+    installed: string[];
+    failed: { skill: string; error: string }[];
+}> => {
+    if (!skills || skills.length === 0) {
+        log.debug('No skills to install');
+        return { success: true, installed: [], failed: [] };
+    }
+
+    log.info('Installing skills', { count: skills.length, skills });
+
+    const installed: string[] = [];
+    const failed: { skill: string; error: string }[] = [];
+
+    for (const skill of skills) {
+        try {
+            log.debug('Installing skill', { skill });
+            await execAsync(`npx -y skills add --global --yes --all ${skill}`, {
+                timeout: 120000, // 2 minutes per skill
+                cwd: SANDBOX_DIR,
+            });
+
+            installed.push(skill);
+            log.debug('Skill installed successfully', { skill });
+        } catch (error) {
+            const err = error as Error;
+            log.warning('Failed to install skill', { skill, error: err.message });
+            failed.push({ skill, error: err.message });
+        }
+    }
+
+    const success = failed.length === 0;
+    log.info('Skills installation completed', { installed: installed.length, failed: failed.length });
+
+    return { success, installed, failed };
+};
+
+/**
  * Setup complete execution environment
- * Initializes both Node.js and Python environments and installs specified dependencies
+ * Initializes both Node.js and Python environments and installs specified dependencies and skills
  * In local mode (MODE=local), skips sandbox initialization
  */
 export const setupExecutionEnvironment = async (input: {
+    skills?: string[];
     nodeDependencies?: Record<string, string>;
     pythonRequirementsTxt?: string;
 }): Promise<{
     success: boolean;
+    skillsSetup: { success: boolean; installed: string[]; failed: { skill: string; error: string }[] };
     nodeSetup: { success: boolean; installed: string[]; failed: { library: string; error: string }[] };
     pythonSetup: { success: boolean; installed: string[]; failed: { library: string; error: string }[] };
     errors: string[];
@@ -280,6 +327,7 @@ export const setupExecutionEnvironment = async (input: {
         log.info('Local mode detected - skipping sandbox environment setup');
         return {
             success: true,
+            skillsSetup: { success: true, installed: [], failed: [] },
             nodeSetup: { success: true, installed: [], failed: [] },
             pythonSetup: { success: true, installed: [], failed: [] },
             errors: [],
@@ -297,16 +345,19 @@ export const setupExecutionEnvironment = async (input: {
         log.error('Environment initialization failed', { error: err.message });
     }
 
-    // Install dependencies
-    const [nodeSetup, pythonSetup] = await Promise.all([
+    // Install skills and dependencies
+    const [skillsSetup, nodeSetup, pythonSetup] = await Promise.all([
+        installSkills(input.skills),
         installNodeLibraries(input.nodeDependencies),
         installPythonLibraries(input.pythonRequirementsTxt),
     ]);
 
-    const success = errors.length === 0 && nodeSetup.success && pythonSetup.success;
+    const success = errors.length === 0 && skillsSetup.success && nodeSetup.success && pythonSetup.success;
 
     log.info('Execution environment setup completed', {
         success,
+        skillsInstalled: skillsSetup.installed.length,
+        skillsFailed: skillsSetup.failed.length,
         nodeDependenciesInstalled: nodeSetup.installed.length,
         nodeDependenciesFailed: nodeSetup.failed.length,
         pythonRequirementsInstalled: pythonSetup.installed.length,
@@ -315,6 +366,7 @@ export const setupExecutionEnvironment = async (input: {
 
     return {
         success,
+        skillsSetup,
         nodeSetup,
         pythonSetup,
         errors,

@@ -15,6 +15,17 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
+       "skills": {
+        "title": "Skills",
+        "type": "array",
+        "description": "List of skill packages to install for the AI coding agent. Skills are SKILLS.md files that provide specialized instructions. For more info see https://skills.sh/. Example: apify/agent-skills",
+        "editor": "stringList",
+        "items": {
+          "type": "string"
+        },
+        "default": ["apify/agent-skills"],
+        "prefill": ["apify/agent-skills"]
+      },
       "initShellScript": {
         "title": "Initialization Script",
         "type": "string",

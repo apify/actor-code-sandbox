@@ -77,12 +77,15 @@ if (restoredFromMigration) {
     log.info('Skipping dependency installation (already restored from migration)');
     setupResult = {
         success: true,
+        skillsSetup: { installed: [], failed: [] },
         nodeSetup: { installed: [], failed: [] },
         pythonSetup: { installed: [], failed: [] },
+        errors: [],
     };
 } else {
     log.info('Setting up execution environment...');
     setupResult = await setupExecutionEnvironment({
+        skills: input?.skills,
         nodeDependencies: input?.nodeDependencies,
         pythonRequirementsTxt: input?.pythonRequirementsTxt,
     });
@@ -90,13 +93,15 @@ if (restoredFromMigration) {
 
 if (!setupResult.success) {
     log.warning('Some dependencies failed to install', {
+        skillsInstalled: setupResult.skillsSetup.installed,
+        skillsFailed: setupResult.skillsSetup.failed,
         nodeInstalled: setupResult.nodeSetup.installed,
         nodeFailed: setupResult.nodeSetup.failed,
         pythonInstalled: setupResult.pythonSetup.installed,
         pythonFailed: setupResult.pythonSetup.failed,
     });
 } else {
-    log.info('All dependencies installed successfully');
+    log.info('All dependencies and skills installed successfully');
 }
 
 // Execute init script if provided and not empty
@@ -789,7 +794,7 @@ app.all('/shell*', (req, res) => {
     let path = req.url.replace(/^\/shell/, '') || '/';
     // Ensure path starts with / (handle query strings like ?arg=...)
     if (path.startsWith('?')) {
-        path = '/' + path;
+        path = `/${  path}`;
     }
     const options = {
         hostname: '127.0.0.1',
@@ -834,7 +839,7 @@ app.all('/browser*', (req, res) => {
     // Rewrite path: /browser/foo → /foo
     req.url = req.url.replace(/^\/browser/, '') || '/';
     if (req.url.startsWith('?')) {
-        req.url = '/' + req.url;
+        req.url = `/${  req.url}`;
     }
 
     log.info('Proxying browser HTTP request', { url: req.url });

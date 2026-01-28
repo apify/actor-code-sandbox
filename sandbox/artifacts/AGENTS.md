@@ -111,6 +111,31 @@ Pre-configured and ready:
     - **`APIFY_TOKEN`** - API authentication token
     - **`ACTOR_DEFAULT_DATASET_ID`** - Default dataset ID for this Actor
     - **`ACTOR_DEFAULT_KEY_VALUE_STORE_ID`** - Default key-value store ID for this Actor
+
+### 🚨 CRITICAL: APIFY_TOKEN Already Available in Environment
+
+The **`APIFY_TOKEN`** environment variable is **already set and ready to use** in your current environment. You can freely use it in any script without additional setup:
+
+**Python:**
+```python
+import os
+token = os.environ['APIFY_TOKEN']  # ✅ Already available - use it directly!
+client = ApifyClient(token)
+```
+
+**JavaScript/TypeScript:**
+```javascript
+const token = process.env.APIFY_TOKEN;  // ✅ Already available - use it directly!
+const client = new ApifyClient({ token });
+```
+
+**Bash/Shell:**
+```bash
+echo $APIFY_TOKEN  # ✅ Already available - use it directly!
+mcpc --header "Authorization: Bearer $APIFY_TOKEN" https://mcp.apify.com tools-list --json
+```
+
+**No setup required:** The token is pre-configured. Just reference it and start building!
 - **apify-client** pre-installed:
     - Python: `/sandbox/py/venv` (activated automatically for Python execution)
     - JavaScript/TypeScript: `/sandbox/js-ts/node_modules` (available for JS/TS execution)

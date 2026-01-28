@@ -24,8 +24,13 @@ This Actor [metamorphs](https://docs.apify.com/platform/actors/development/progr
 
 | Input | Description | Default |
 |-------|-------------|---------|
+| `skills` | Skill packages to install (SKILLS.md files) | `["apify/agent-skills"]` |
 | `initShellScript` | Bash script to run before OpenCode starts | - |
 | `idleTimeoutSeconds` | Shutdown after inactivity | 600 |
+
+## 📚 Skills Support
+
+This Actor supports [SKILLS.md](https://skills.sh/) files - specialized instructions that enhance AI coding agent capabilities. Skills are installed automatically at startup.
 
 ## 🎯 Use Cases
 

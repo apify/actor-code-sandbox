@@ -4,6 +4,14 @@
 
 export interface ActorInput {
     /**
+     * Skill packages to install for the AI coding agent
+     * Skills are SKILL.md files that provide specialized instructions
+     * Format: array of skill package names or URLs
+     * Example: ["apify/agent-skills"]
+     */
+    skills?: string[];
+
+    /**
      * Node.js dependencies object for JavaScript and TypeScript code execution
      * Format: { "package-name": "version", ... }
      * Example: { "zod": "^3.0", "axios": "latest" }
