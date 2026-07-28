@@ -57,6 +57,13 @@ echo -e "  - Claude Code:   \$CLAUDE_CODE_VER"
 echo -e "  - Codex CLI:     \$CODEX_VER"
 echo -e "  - OpenCode:      \$OPENCODE_VER"
 echo -e "  - LLM API:       https://apify.com/apify/openrouter"
+if [ -n "\$ACTOR_MEMORY_MBYTES" ]; then
+    if [ \$((ACTOR_MEMORY_MBYTES % 1024)) -eq 0 ]; then
+        echo -e "  - Memory:        \$((ACTOR_MEMORY_MBYTES / 1024)) GB"
+    else
+        echo -e "  - Memory:        \$ACTOR_MEMORY_MBYTES MB"
+    fi
+fi
 echo -e "  - Working dir:   \$(pwd)"
 
 echo ""
