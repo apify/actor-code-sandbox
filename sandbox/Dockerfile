@@ -97,7 +97,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #     ~110 MB to ~36 MB — watch the installed size when bumping this.
 ARG TSX_VERSION=4.23.1
 ARG APIFY_CLI_VERSION=1.7.1
-ARG MCPC_VERSION=0.5.0
+ARG MCPC_VERSION=0.6.0
 RUN npm install -g "tsx@${TSX_VERSION}" \
     && npm install -g --ignore-scripts "apify-cli@${APIFY_CLI_VERSION}" \
     && npm install -g "@apify/mcpc@${MCPC_VERSION}" \
